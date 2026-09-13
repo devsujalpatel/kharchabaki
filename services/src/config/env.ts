@@ -12,4 +12,8 @@ const parsePort = (value: string | undefined): number => {
 export const env = {
   port: parsePort(process.env.PORT),
   nodeEnv: process.env.NODE_ENV || 'development',
+  googleClientId: process.env.GOOGLE_CLIENT_ID as string,
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+  webUrl: process.env.FRONTEND_URL_WEB as string,
+  appUrl: process.env.FRONTEND_URL_APP as string,
 } as const;
