@@ -13,18 +13,19 @@ export const app = express();
 
 app.disable('x-powered-by');
 
-app.all('/api/auth/*splat', toNodeHandler(auth));
+const acceptedOrigins = ['http://localhost:3000'];
 
-const acceptedOrigins = [env.webUrl, env.appUrl];
-
-app.use(express.json({ limit: '2mb' }));
 app.use(
   cors({
     origin: acceptedOrigins, // Replace with your frontend's origin
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], // Specify allowed HTTP methods
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // Specify allowed HTTP methods
     credentials: true, // Allow credentials (cookies, authorization headers, etc.)
   }),
 );
+
+app.all('/api/auth/*splat', toNodeHandler(auth));
+
+app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 app.get('/', (_req, res) => {
