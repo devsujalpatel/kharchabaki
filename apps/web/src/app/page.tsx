@@ -9,16 +9,16 @@ import {
   Command,
   CreditCard,
   LayoutDashboard,
-  Menu,
   ReceiptText,
   Sparkles,
   Target,
-  X,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 import { DashboardPreview } from "@/components/hero/dashboard-preview";
+import { MenuButton } from "@/components/navbar/menu-button";
+import { AnimatePresence, motion } from "motion/react";
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -62,6 +62,7 @@ export default function Home() {
       Bolt,
     ],
   ] as const;
+
   return (
     <main className="min-h-screen overflow-hidden bg-[#111310] text-[#f4f6ee]">
       <section className="relative border-b border-white/[.07]">
@@ -94,34 +95,70 @@ export default function Home() {
               Start for free <ArrowRight />
             </Button>
           </div>
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="grid size-10 place-items-center rounded-lg border border-white/10 md:hidden"
-          >
-            <Menu className="size-5" />
-          </button>
-          {menuOpen && (
-            <div className="absolute right-5 top-16 z-20 w-52 rounded-xl border border-white/10 bg-[#20241d] p-3 shadow-2xl md:hidden">
-              <button
-                className="absolute right-2 top-2 text-[#9ba594]"
-                onClick={() => setMenuOpen(false)}
+          <MenuButton
+            open={menuOpen}
+            onClick={() => setMenuOpen((prev) => !prev)}
+          />
+          <AnimatePresence>
+            {menuOpen && (
+              <motion.div
+                initial={{
+                  opacity: 0,
+                  y: -8,
+                  scale: 0.96,
+                  filter: "blur(4px)",
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                  scale: 1,
+                  filter: "blur(0px)",
+                }}
+                exit={{
+                  opacity: 0,
+                  y: -6,
+                  scale: 0.97,
+                  filter: "blur(3px)",
+                }}
+                transition={{
+                  duration: 0.25,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                className="absolute right-5 top-16 z-20 w-52 rounded-xl border border-white/10 bg-[#20241d] p-3 shadow-2xl md:hidden"
               >
-                <X className="size-4" />
-              </button>
-              {["Features", "How it works", "Pricing", "FAQ"].map((x) => (
-                <a
-                  key={x}
-                  href={`#${x.toLowerCase().replaceAll(" ", "-")}`}
-                  className="block rounded-md px-3 py-2 text-sm text-[#cdd2c7] hover:bg-white/5"
+                {["Features", "How it works", "Pricing", "FAQ"].map(
+                  (x, index) => (
+                    <motion.a
+                      key={x}
+                      href={`#${x.toLowerCase().replaceAll(" ", "-")}`}
+                      initial={{ opacity: 0, x: -4 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -2 }}
+                      transition={{
+                        duration: 0.2,
+                        delay: index * 0.035,
+                        ease: "easeOut",
+                      }}
+                      className="block rounded-md px-3 py-2 text-sm text-[#cdd2c7] transition-colors hover:bg-white/5"
+                    >
+                      {x}
+                    </motion.a>
+                  ),
+                )}
+
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  transition={{ duration: 0.2, delay: 0.1 }}
                 >
-                  {x}
-                </a>
-              ))}
-              <Button className="mt-2 w-full bg-[#cbff3d] text-[#172011]">
-                Start for free
-              </Button>
-            </div>
-          )}
+                  <Button className="mt-2 w-full bg-[#cbff3d] text-[#172011] hover:bg-[#cbff3d]/70">
+                    Start for free
+                  </Button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </nav>
         <div className="relative mx-auto max-w-5xl px-5 pb-0 pt-16 text-center sm:pt-24">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#caff3d]/25 bg-[#caff3d]/8 px-3 py-1.5 text-xs font-medium text-[#d9ff83]">
