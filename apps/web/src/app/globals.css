@@ -128,3 +128,11 @@
     @apply font-sans;
   }
 }
+
+@layer utilities {
+  .grid-bg {
+    background-image: linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: linear-gradient(to bottom, black, transparent 82%);
+  }
+}
