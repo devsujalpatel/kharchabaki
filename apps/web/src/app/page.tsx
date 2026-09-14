@@ -19,6 +19,7 @@ import { Logo } from "@/components/logo";
 import { DashboardPreview } from "@/components/hero/dashboard-preview";
 import { MenuButton } from "@/components/navbar/menu-button";
 import { AnimatePresence, motion } from "motion/react";
+import Link from "next/link";
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -85,12 +86,14 @@ export default function Home() {
             </a>
           </div>
           <div className="hidden items-center gap-3 md:flex">
-            <Button
-              variant="ghost"
-              className="text-[#d9ddd4] hover:bg-white/5 hover:text-white"
-            >
-              Sign in
-            </Button>
+            <Link href="/signin">
+              <Button
+                variant="ghost"
+                className="text-[#d9ddd4] hover:bg-white/5 hover:text-white"
+              >
+                Sign in
+              </Button>
+            </Link>
             <Button className="bg-[#cbff3d] px-4 font-semibold text-[#182014] hover:bg-[#dbff72]">
               Start for free <ArrowRight />
             </Button>
