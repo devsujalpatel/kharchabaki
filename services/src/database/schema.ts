@@ -16,8 +16,8 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
-  balance: decimal('balance', { precision: 19, scale: 4 })
-    .default('0.0000')
+  balance: decimal('balance', { precision: 19, scale: 2 })
+    .default('0.00')
     .notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at')
@@ -143,7 +143,7 @@ export const income = pgTable(
       }),
     amount: decimal('amount', {
       precision: 19,
-      scale: 4,
+      scale: 2,
     }).notNull(),
     source: incomeSourceEnum('source').notNull(),
     receivedAt: timestamp('received_at').defaultNow().notNull(),
@@ -170,7 +170,7 @@ export const expense = pgTable(
       }),
     amount: decimal('amount', {
       precision: 19,
-      scale: 4,
+      scale: 2,
     }).notNull(),
     category: expenseCategoryEnum('category').notNull(),
     description: text('description'),
@@ -198,7 +198,7 @@ export const takenLoan = pgTable(
 
     amount: decimal('amount', {
       precision: 19,
-      scale: 4,
+      scale: 2,
     }).notNull(),
 
     borrowedFrom: text('borrowed_from').notNull(),
@@ -208,14 +208,14 @@ export const takenLoan = pgTable(
       precision: 19,
       scale: 4,
     })
-      .default('0.0000')
+      .default('0.00')
       .notNull(),
 
     interest: decimal('interest', {
       precision: 7,
-      scale: 4,
+      scale: 2,
     })
-      .default('0.0000')
+      .default('0.00')
       .notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
@@ -241,7 +241,7 @@ export const loanPayment = pgTable(
       }),
     amount: decimal('amount', {
       precision: 19,
-      scale: 4,
+      scale: 2,
     }).notNull(),
     paidAt: timestamp('paid_at').defaultNow().notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -259,22 +259,22 @@ export const givenLoan = pgTable(
       .references(() => user.id, { onDelete: 'cascade' }),
     amount: decimal('amount', {
       precision: 19,
-      scale: 4,
+      scale: 2,
     }).notNull(),
     paidAmount: decimal('paid_amount', {
       precision: 19,
-      scale: 4,
+      scale: 2,
     })
-      .default('0.0000')
+      .default('0.00')
       .notNull(),
     borrowerName: text('borrower_name').notNull(),
     status: loanStatusEnum('status').default('active').notNull(),
     dueDate: timestamp('due_date').notNull(),
     interest: decimal('interest', {
       precision: 7,
-      scale: 4,
+      scale: 22,
     })
-      .default('0.0000')
+      .default('0.00')
       .notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
@@ -297,7 +297,7 @@ export const givenLoanPayment = pgTable(
       .references(() => givenLoan.id, { onDelete: 'cascade' }),
     amount: decimal('amount', {
       precision: 19,
-      scale: 4,
+      scale: 2,
     }).notNull(),
     paidAt: timestamp('paid_at').defaultNow().notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
