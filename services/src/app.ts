@@ -28,12 +28,12 @@ app.all('/api/auth/*splat', toNodeHandler(auth));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-app.get('/', (_req, res) => {
+app.get('/', (_request, response) => {
   const body: ApiResponse<never> = {
     success: true,
     message: 'kharchabaki.in API is running',
   };
-  res.status(200).json(body);
+  response.status(200).json(body);
 });
 
 app.use(API_PREFIX, apiRouter);

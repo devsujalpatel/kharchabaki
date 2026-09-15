@@ -8,6 +8,13 @@
       "when": 1789343748365,
       "tag": "0000_big_thing",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789418717356,
+      "tag": "0001_noisy_harrier",
+      "breakpoints": true
     }
   ]
 }

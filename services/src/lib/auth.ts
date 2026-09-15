@@ -1,7 +1,9 @@
 import { betterAuth } from 'better-auth';
+import { admin } from 'better-auth/plugins';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import 'dotenv/config';
 
+import * as schema from '../database/schema.js';
 import { db } from '../database/client.js';
 import { env } from '../config/env.js';
 
@@ -10,6 +12,7 @@ export const auth = betterAuth({
   basePath: '/api/auth',
   database: drizzleAdapter(db, {
     provider: 'pg',
+    schema,
   }),
 
   // OAuth only
@@ -21,6 +24,8 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     },
   },
+
+  plugins: [admin()],
 
   // Add your frontend origin if it is hosted separately.
   trustedOrigins: [env.webUrl, env.appUrl],

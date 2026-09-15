@@ -1,15 +1,15 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
+import { useSession } from "@/hooks/use-session";
 
 export default function UserProfile() {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending, isError } = useSession();
 
   if (isPending) {
     return <p>Loading...</p>;
   }
 
-  if (!session) {
+  if (isError || !session) {
     return <p>Not authenticated</p>;
   }
 

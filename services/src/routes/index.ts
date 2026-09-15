@@ -1,10 +1,13 @@
-import { response, Router } from 'express';
+import { Router } from 'express';
 import { ApiResponse } from '../types/common.types.js';
 import { SERVICE_NAME } from '../config/constans.js';
+import { authRouter } from '../modules/auth/auth.route.js';
 
 export const apiRouter = Router();
 
-apiRouter.get('/health', (_req, res) => {
+apiRouter.use(authRouter);
+
+apiRouter.get('/health', (_request, response) => {
   const body: ApiResponse<{
     service: string;
     status: 'healthy';
@@ -18,5 +21,5 @@ apiRouter.get('/health', (_req, res) => {
       timestamp: new Date().toISOString(),
     },
   };
-  res.status(200).json(body);
+  response.status(200).json(body);
 });

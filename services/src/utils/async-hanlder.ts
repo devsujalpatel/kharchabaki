@@ -8,6 +8,6 @@ type AsyncRequestHandler = (
 
 export const asyncHandler =
   (handler: AsyncRequestHandler): RequestHandler =>
-  (req, res, next) => {
-    void handler(req, res, next).catch(next);
+  (request, response, next) => {
+    void handler(request, response, next).catch(next);
   };
