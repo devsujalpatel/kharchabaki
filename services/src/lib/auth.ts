@@ -40,7 +40,4 @@ export const auth = betterAuth({
       ipAddressHeaders: ['cf-connecting-ip'],
     },
   },
-  account: {
-    skipStateCookieCheck: true,
-  },
 });
