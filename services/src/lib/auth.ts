@@ -38,7 +38,7 @@ export const auth = betterAuth({
       httpOnly: env.nodeEnv === 'production',
     },
     ipAddress: {
-      ipAddressHeaders: ["x-real-ip"]
+      ipAddressHeaders: ["cf-connecting-ip"]
     }
   },
 });
