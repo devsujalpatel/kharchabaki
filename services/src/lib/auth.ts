@@ -37,5 +37,8 @@ export const auth = betterAuth({
       secure: env.nodeEnv === 'production',
       httpOnly: env.nodeEnv === 'production',
     },
+    ipAddress: {
+      ipAddressHeaders: ["x-real-ip"]
+    }
   },
 });

@@ -26,6 +26,14 @@ app.use(
   }),
 );
 
+app.get("/debug/headers", (req, res) => {
+  res.json({
+    forwardedFor: req.headers["x-forwarded-for"],
+    realIp: req.headers["x-real-ip"],
+    cfConnectingIp: req.headers["cf-connecting-ip"],
+  });
+});
+
 app.all('/api/auth/*splat', toNodeHandler(auth));
 
 app.use(express.json({ limit: '2mb' }));
@@ -38,6 +46,7 @@ app.get('/', (_request, response) => {
   };
   response.status(200).json(body);
 });
+
 
 app.use(API_PREFIX, apiRouter);
 app.use(notFoundHandler);
