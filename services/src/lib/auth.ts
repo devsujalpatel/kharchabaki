@@ -35,10 +35,6 @@ export const auth = betterAuth({
     env.webUrl,
   ],
   advanced: {
-    crossSubDomainCookies: {
-      enabled: true,
-    },
-    useSecureCookies: true,
     defaultCookieAttributes: {
       secure: true,
       sameSite: 'None', // Required for cross-domain cookies
