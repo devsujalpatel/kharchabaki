@@ -35,8 +35,8 @@ apiRouter.get('/health', (_request, response) => {
 });
 
 
-apiRouter.use(authRouter);
 // protected routes
+apiRouter.use(checkAuth, authRouter);
 apiRouter.use(checkAuth, balanceRouter);
 apiRouter.use(checkAuth, transactionRouter);
 apiRouter.use(checkAuth, incomeRouter);
