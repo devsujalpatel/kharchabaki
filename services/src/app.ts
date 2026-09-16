@@ -8,12 +8,15 @@ import { apiRouter } from './routes/index.js';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './lib/auth.js';
 import { env } from './config/env.js';
+import helmet from 'helmet';
 
 export const app = express();
 
 app.disable('x-powered-by');
 
 const acceptedOrigins = ['http://localhost:3000'];
+
+app.use(helmet());
 
 app.use(
   cors({

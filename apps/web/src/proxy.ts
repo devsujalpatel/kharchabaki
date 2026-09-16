@@ -16,6 +16,9 @@ export async function proxy(request: NextRequest) {
   }
 
   const res = await response.json();
+  if (res.success === false) {
+    return NextResponse.redirect(new URL("/signin", request.url));
+  }
 
   if (!res?.data?.session) {
     return NextResponse.redirect(new URL("/signin", request.url));

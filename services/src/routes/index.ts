@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { ApiResponse } from '../types/common.types.js';
 import { SERVICE_NAME } from '../config/constans.js';
 import { authRouter } from '../modules/auth/auth.route.js';
+import { checkAuth } from '../middleware/auth.middleware.js';
+import { balanceRouter } from '../modules/balance/balance.route.js';
 
 export const apiRouter = Router();
 
@@ -23,3 +25,6 @@ apiRouter.get('/health', (_request, response) => {
   };
   response.status(200).json(body);
 });
+
+// protected routes
+apiRouter.use(checkAuth, balanceRouter);
