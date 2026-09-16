@@ -8,10 +8,7 @@ import { db } from '../database/client.js';
 import { env } from '../config/env.js';
 
 export const auth = betterAuth({
-  baseURL: {
-    allowedHosts: ['https://kharchabaki.vercel.app'],
-    fallback: env.betterAuthUrl || 'https://kharchabaki.onrender.com',
-  },
+  baseURL: 'https://kharchabaki.onrender.com',
   basePath: '/api/auth',
 
   database: drizzleAdapter(db, {
@@ -29,20 +26,13 @@ export const auth = betterAuth({
   },
 
   trustedOrigins: [
-    'https://kharchabaki.onrender.com',
     'https://kharchabaki.vercel.app',
-    env.appUrl,
-    env.webUrl,
+    'https://kharchabaki.onrender.com',
   ],
+
   advanced: {
-    defaultCookieAttributes: {
-      secure: true,
-      sameSite: 'None', // Required for cross-domain cookies
-      partitioned: false, // Turn off if experiencing Chrome/Vercel issues
-    },
     ipAddress: {
       ipAddressHeaders: ['cf-connecting-ip'],
     },
-    trustedProxyHeaders: true,
   },
 });
