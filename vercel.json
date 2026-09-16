@@ -5,7 +5,7 @@
       "framework": "nextjs"
     },
     "src": {
-      "root": "services/src"
+      "root": "services"
     }
   },
   "rewrites": [
