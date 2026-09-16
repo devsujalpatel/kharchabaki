@@ -25,10 +25,7 @@ export const auth = betterAuth({
     },
   },
 
-  trustedOrigins: [
-    'https://kharchabaki.vercel.app',
-    'https://kharchabaki.onrender.com',
-  ],
+  trustedOrigins: ['https://kharchabaki.vercel.app'],
 
   advanced: {
     ipAddress: {
