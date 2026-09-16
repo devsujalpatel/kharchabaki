@@ -31,4 +31,11 @@ export const auth = betterAuth({
     env.appUrl,
     env.webUrl,
   ],
+  advanced: {
+    defaultCookieAttributes: {
+      sameSite: 'none',
+      secure: env.nodeEnv === 'production',
+      httpOnly: env.nodeEnv === 'production',
+    },
+  },
 });
