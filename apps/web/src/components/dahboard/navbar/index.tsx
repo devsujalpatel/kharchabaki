@@ -92,6 +92,7 @@ export function Navbar() {
               >
                 <Link
                   href={item.href}
+                  prefetch
                   className="flex items-center justify-center gap-1"
                 >
                   <Icon className="size-4" />

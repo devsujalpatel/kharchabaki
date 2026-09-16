@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getDashboardSummary } from './summary.service.js';
+import { getDashboardSummaryController } from './summary.controller.js';
 
 export const summaryRouter = Router();
 
-summaryRouter.get('/summary', getDashboardSummary);
+summaryRouter.get('/summary', getDashboardSummaryController);

@@ -1,5 +1,5 @@
 import { betterAuth } from 'better-auth';
-// import { admin } from 'better-auth/plugins';
+import { admin } from 'better-auth/plugins';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import 'dotenv/config';
 
@@ -8,12 +8,15 @@ import { db } from '../database/client.js';
 import { env } from '../config/env.js';
 
 export const auth = betterAuth({
-  database: drizzleAdapter(db, { provider: 'pg', schema }),
-  advanced: {
-    database: { joins: false },
-  },
   baseURL: process.env.BETTER_AUTH_URL!,
   basePath: '/api/auth',
+
+  database: drizzleAdapter(db, {
+    provider: 'pg',
+    schema,
+  }),
+
+  plugins: [admin()],
 
   socialProviders: {
     google: {

@@ -10,6 +10,7 @@ export const getDashboardSummary = async (userId: string) => {
 
   const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
+
   const [userBalance, monthlyIncome, monthlyExpense] = await Promise.all([
     db
       .select({

@@ -4,7 +4,6 @@ import { useForm } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Wallet, Plus, Loader2 } from "lucide-react";
 
-import { balanceQuery } from "@/server/balance";
 import { addIncome, addExpense } from "@/server/transactions";
 
 import { Button } from "@/components/ui/button";
@@ -166,6 +165,8 @@ export default function Dashboard() {
     queryKey: ["dashboard-summary"],
     queryFn: dashboardSummaryQuery,
   });
+
+  console.log(summary)
 
   const balance = Number(summary?.data.balance ?? 0);
   const income = Number(summary?.data.income ?? 0);
