@@ -1,0 +1,27 @@
+{
+  "services": {
+    "web": {
+      "root": "apps/web",
+      "framework": "nextjs"
+    },
+    "src": {
+      "root": "services/src"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/src(/.*)?",
+      "destination": {
+        "type": "service",
+        "service": "src"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "type": "service",
+        "service": "web"
+      }
+    }
+  ]
+}

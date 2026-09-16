@@ -7,7 +7,6 @@ import { errorHandler } from './middleware/error.middleware.js';
 import { apiRouter } from './routes/index.js';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './lib/auth.js';
-import { env } from './config/env.js';
 import helmet from 'helmet';
 
 export const app = express();
