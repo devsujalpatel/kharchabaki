@@ -8,7 +8,7 @@ import { db } from '../database/client.js';
 import { env } from '../config/env.js';
 
 export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL!,
+  baseURL: env.betterAuthUrl,
   basePath: '/api/auth',
 
   database: drizzleAdapter(db, {
