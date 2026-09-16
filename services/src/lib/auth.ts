@@ -32,8 +32,15 @@ export const auth = betterAuth({
     env.webUrl,
   ],
   advanced: {
+    defaultCookieAttributes: {
+      sameSite: 'None',
+      httpOnly: true,
+    },
     ipAddress: {
-      ipAddressHeaders: ["cf-connecting-ip"]
-    }
+      ipAddressHeaders: ['cf-connecting-ip'],
+    },
+  },
+  account: {
+    skipStateCookieCheck: true,
   },
 });
