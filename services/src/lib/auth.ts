@@ -25,5 +25,5 @@ export const auth = betterAuth({
     },
   },
 
-  trustedOrigins: [env.webUrl, env.appUrl],
+  trustedOrigins: ['https://kharchabaki.onrender.com', env.appUrl, env.webUrl],
 });
