@@ -8,7 +8,7 @@ import { db } from '../database/client.js';
 import { env } from '../config/env.js';
 
 export const auth = betterAuth({
-  baseURL: env.betterAuthUrl,
+  baseURL: env.betterAuthUrl || "https://kharchabaki.onrender.com",
   basePath: '/api/auth',
 
   database: drizzleAdapter(db, {
@@ -32,10 +32,6 @@ export const auth = betterAuth({
     env.webUrl,
   ],
   advanced: {
-    defaultCookieAttributes: {
-      sameSite: 'None',
-      httpOnly: true,
-    },
     ipAddress: {
       ipAddressHeaders: ['cf-connecting-ip'],
     },
