@@ -19,7 +19,7 @@ export function LoginForm({
   const handleClick = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: `${process.env.NEXT_PUBLIC_WEB_URL}/dashboard`,
+      callbackURL: `${process.env.WEB_URL}/dashboard`,
     });
   };
   return (
