@@ -15,7 +15,6 @@ import { summaryRouter } from '../modules/summary/summary.route.js';
 
 export const apiRouter = Router();
 
-apiRouter.use(authRouter);
 
 //health
 apiRouter.get('/health', (_request, response) => {
@@ -35,6 +34,8 @@ apiRouter.get('/health', (_request, response) => {
   response.status(200).json(body);
 });
 
+
+apiRouter.use(authRouter);
 // protected routes
 apiRouter.use(checkAuth, balanceRouter);
 apiRouter.use(checkAuth, transactionRouter);
