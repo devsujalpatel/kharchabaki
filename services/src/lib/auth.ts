@@ -32,11 +32,6 @@ export const auth = betterAuth({
     env.webUrl,
   ],
   advanced: {
-    defaultCookieAttributes: {
-      sameSite: 'none',
-      secure: env.nodeEnv === 'production',
-      httpOnly: env.nodeEnv === 'production',
-    },
     ipAddress: {
       ipAddressHeaders: ["cf-connecting-ip"]
     }
