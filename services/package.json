@@ -24,15 +24,16 @@
   "packageManager": "pnpm@12.4.1",
   "type": "module",
   "dependencies": {
-    "@better-auth/drizzle-adapter": "^1.7.4",
+    "@better-auth/drizzle-adapter": "^1.7.5",
     "@neondatabase/serverless": "^1.1.0",
-    "better-auth": "^1.7.4",
+    "better-auth": "^1.7.5",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
     "helmet": "^8.3.0",
     "pg": "^8.23.0",
+    "ws": "^8.21.3",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -40,6 +41,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^22.20.2",
     "@types/pg": "^8.23.1",
+    "@types/ws": "^8.18.1",
     "drizzle-kit": "^0.31.10",
     "prettier": "^3.9.6",
     "tsx": "^4.23.13",

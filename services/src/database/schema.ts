@@ -146,6 +146,7 @@ export const income = pgTable(
       scale: 2,
     }).notNull(),
     source: incomeSourceEnum('source').notNull(),
+    description: text('description'),
     receivedAt: timestamp('received_at').defaultNow().notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')

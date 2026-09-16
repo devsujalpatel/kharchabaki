@@ -51,3 +51,47 @@ export async function addExpense(data: ExpenseInput) {
     body: JSON.stringify(data),
   });
 }
+
+export type Transaction = {
+  id: string;
+  type: "income" | "expense";
+  amount: number;
+  description?: string | null;
+  category?: string | null;
+  source?: string | null;
+  createdAt: string;
+};
+
+export type TransactionResponse = {
+  success: boolean;
+  message: string;
+  data: Transaction[];
+};
+
+export type TransactionFilters = {
+  type: "all" | "income" | "expense";
+  category: string;
+  search: string;
+};
+
+export async function transactionsQuery(
+  filters: TransactionFilters,
+): Promise<TransactionResponse> {
+  const params = new URLSearchParams();
+
+  if (filters.type !== "all") {
+    params.set("type", filters.type);
+  }
+
+  if (filters.category !== "all") {
+    params.set("category", filters.category);
+  }
+
+  if (filters.search.trim()) {
+    params.set("search", filters.search.trim());
+  }
+
+  const query = params.toString();
+
+  return api<TransactionResponse>(`/transactions${query ? `?${query}` : ""}`);
+}

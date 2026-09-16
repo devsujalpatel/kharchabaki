@@ -52,10 +52,10 @@ export function Navbar() {
   };
 
   return (
-    <div className="sticky top-0 z-50 px-4 pt-4 sm:px-6">
+    <div className="sticky top-0 z-50  pt-4 ">
       <header
         className="
-          mx-auto flex h-14 max-w-5xl items-center
+          mx-auto flex h-14 max-w-6xl items-center
           rounded-2xl border border-border/50
           bg-background/70 px-2
           shadow-lg shadow-black/5

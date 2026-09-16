@@ -64,6 +64,8 @@ export default function Home() {
     ],
   ] as const;
 
+  
+
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
       <section className="relative border-b border-white/7">

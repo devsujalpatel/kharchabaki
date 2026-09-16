@@ -32,7 +32,7 @@ export const NavigationBreadcrumb = () => {
   }
 
   return (
-    <div className="flex items-center ml-20">
+    <div className="flex items-center">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" className="size-8">
           <Link href="/dashboard" aria-label="Go back to dashboard">

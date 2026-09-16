@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { dashboardSummaryQuery } from "@/server/summary";
 
 const expenseCategories = [
   "food",
@@ -53,25 +55,20 @@ const incomeSources = [
   "other",
 ] as const;
 
-type IncomeForm = {
-  amount: number;
-  source: (typeof incomeSources)[number] | "";
-  description?: string;
-};
-
 type ExpenseForm = {
   amount: number;
   category: (typeof expenseCategories)[number] | "";
   description?: string;
 };
 
+type IncomeForm = {
+  amount: number;
+  source: (typeof incomeSources)[number] | "";
+  description?: string;
+};
+
 export default function Dashboard() {
   const queryClient = useQueryClient();
-
-  const { data: balanceData, isPending: isBalanceLoading } = useQuery({
-    queryKey: ["balance"],
-    queryFn: balanceQuery,
-  });
 
   /*
    * These should be backed by your API.
@@ -82,23 +79,6 @@ export default function Dashboard() {
    *
    * For now, they can be fetched from your dashboard endpoint.
    */
-
-  const { data: summary, isPending: isSummaryLoading } = useQuery({
-    queryKey: ["dashboard-summary"],
-    queryFn: async () => {
-      // Replace this with your real API call
-      return {
-        income: 0,
-        expense: 0,
-      };
-    },
-  });
-
-  type IncomeForm = {
-    amount: number;
-    source: (typeof incomeSources)[number] | "";
-    description?: string;
-  };
 
   const incomeForm = useForm<IncomeForm>({
     defaultValues: {
@@ -181,9 +161,15 @@ export default function Dashboard() {
       description: data.description,
     });
   });
-  const balance = Number(balanceData?.data.balance ?? 0);
-  const income = Number(summary?.income ?? 0);
-  const expense = Number(summary?.expense ?? 0);
+
+  const { data: summary, isPending: isSummaryLoading } = useQuery({
+    queryKey: ["dashboard-summary"],
+    queryFn: dashboardSummaryQuery,
+  });
+
+  const balance = Number(summary?.data.balance ?? 0);
+  const income = Number(summary?.data.income ?? 0);
+  const expense = Number(summary?.data.expense ?? 0);
 
   const formatMoney = (value: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -192,7 +178,7 @@ export default function Dashboard() {
       maximumFractionDigits: 2,
     }).format(value);
 
-  const loading = isBalanceLoading || isSummaryLoading;
+  const loading = isSummaryLoading;
 
   return (
     <div className="space-y-8">
@@ -219,6 +205,7 @@ export default function Dashboard() {
           value={formatMoney(income)}
           icon={ArrowUp}
           loading={loading}
+          type="income"
         />
 
         <SummaryCard
@@ -226,6 +213,7 @@ export default function Dashboard() {
           value={formatMoney(expense)}
           icon={ArrowDown}
           loading={loading}
+          type="expense"
         />
       </div>
 
@@ -493,14 +481,25 @@ function SummaryCard({
   value,
   icon: Icon,
   loading,
+  className,
+  type,
 }: {
   title: string;
   value: string;
   icon: React.ElementType;
   loading: boolean;
+  className?: string;
+  type?: "income" | "expense";
 }) {
   return (
-    <Card className="rounded-2xl">
+    <Card
+      className={cn(
+        "rounded-2xl",
+        className,
+        `${type === "income" && "bg-emerald-500/15"}`,
+        `${type === "expense" && "bg-red-500/15"}`,
+      )}
+    >
       <CardContent className="flex items-center justify-between p-5">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">{title}</p>
@@ -513,7 +512,13 @@ function SummaryCard({
         </div>
 
         <div className="flex size-10 items-center justify-center rounded-xl bg-muted">
-          <Icon className="size-4 text-muted-foreground" />
+          <Icon
+            className={cn(
+              "size-4 text-muted-foreground",
+              `${type === "income" && "text-emerald-500"}`,
+              `${type === "expense" && "text-red-500"}`,
+            )}
+          />
         </div>
       </CardContent>
     </Card>

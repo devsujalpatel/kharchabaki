@@ -1,0 +1,1 @@
+ALTER TABLE "income" ADD COLUMN "description" text;
