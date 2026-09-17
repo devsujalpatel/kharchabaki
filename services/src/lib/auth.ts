@@ -31,7 +31,7 @@ export const auth = betterAuth({
   advanced: {
     crossSubDomainCookies: {
       enabled: true,
-      domain: '.zylrex.com',
+      domain: '.vercel.app',
     },
     useSecureCookies: true,
     ipAddress: {
