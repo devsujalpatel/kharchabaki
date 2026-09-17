@@ -1,6 +1,6 @@
 import { Server } from 'node:http';
 import { SERVICE_NAME } from './config/constans.js';
-import { app } from './app.js';
+import app from './app.js';
 import { env } from './config/env.js';
 
 let server: Server | undefined;
@@ -22,7 +22,7 @@ const closeHttpServer = async (): Promise<void> => {
     server?.close((error) => {
       if (error) {
         reject(error);
-        reject;
+        return;
       }
       resolve();
     });

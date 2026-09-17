@@ -11,7 +11,7 @@ import helmet from 'helmet';
 import { env } from './config/env.js';
 import cookieParser from 'cookie-parser';
 
-export const app = express();
+const app = express();
 
 app.disable('x-powered-by');
 
@@ -53,3 +53,5 @@ app.get('/', (_request, response) => {
 app.use(API_PREFIX, apiRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
+
+export default app;
