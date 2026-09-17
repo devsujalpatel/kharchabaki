@@ -17,4 +17,5 @@ export const env = {
   webUrl: process.env.FRONTEND_URL_WEB as string,
   appUrl: process.env.FRONTEND_URL_APP as string,
   betterAuthUrl: process.env.BETTER_AUTH_URL as string,
+  databaseUrl: process.env.DATABASE_URL as string,
 } as const;

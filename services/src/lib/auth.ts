@@ -8,7 +8,7 @@ import { db } from '../database/client.js';
 import { env } from '../config/env.js';
 
 export const auth = betterAuth({
-  baseURL: 'https://kharchabaki.onrender.com',
+  baseURL: env.betterAuthUrl,
   basePath: '/api/auth',
 
   database: drizzleAdapter(db, {
@@ -25,7 +25,7 @@ export const auth = betterAuth({
     },
   },
 
-  trustedOrigins: ['https://kharchabaki.vercel.app', "https://kharchabaki.onrender.com"],
+  trustedOrigins: [env.webUrl, env.betterAuthUrl],
 
   advanced: {
     ipAddress: {
