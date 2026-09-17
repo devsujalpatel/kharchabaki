@@ -29,6 +29,11 @@ export const auth = betterAuth({
 
   trustedOrigins: [env.webUrl, env.betterAuthUrl],
   advanced: {
+    crossSubDomainCookies: {
+      enabled: true,
+      domain: '.zylrex.com',
+    },
+    useSecureCookies: true,
     ipAddress: {
       ipAddressHeaders: ['cf-connecting-ip'],
     },
