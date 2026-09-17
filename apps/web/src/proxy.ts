@@ -7,8 +7,6 @@ export async function proxy(request: NextRequest) {
     method: "GET",
     headers: {
       cookie: request.headers.get("cookie") ?? "",
-      "x-forwarded-host": request.headers.get("host") ?? "",
-      "x-forwarded-proto": "https",
     },
     cache: "no-store",
   });
