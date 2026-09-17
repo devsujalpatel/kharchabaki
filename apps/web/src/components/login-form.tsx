@@ -19,7 +19,7 @@ export function LoginForm({
   const handleClick = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: `https://kharchabaki.vercel.app/dashboard`,
+      callbackURL: `/dashboard`,
     });
   };
   return (

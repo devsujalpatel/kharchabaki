@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/auth/:path*",
+      "destination": "https://kharchabaki-api.vercel.app/api/auth/:path*"
+    }
+  ]
+}
