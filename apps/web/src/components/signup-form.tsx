@@ -64,7 +64,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
       }
 
       toast.success("Account created successfully");
-      router.push("/auth/signin")
+      router.push("/auth/signin");
     } catch {
       toast.error("Something went wrong. Please try again.");
     }
@@ -178,7 +178,16 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 <FieldSeparator className="my-2">
                   Or continue with
                 </FieldSeparator>
-                <Button variant="outline" type="button">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() =>
+                    authClient.signIn.social({
+                      provider: "google",
+                      callbackURL: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+                    })
+                  }
+                >
                   Sign up with Google
                 </Button>
 

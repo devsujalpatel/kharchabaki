@@ -129,7 +129,16 @@ export function LoginForm({
                 <FieldSeparator className="my-2">
                   Or continue with
                 </FieldSeparator>
-                <Button variant="outline" type="button">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() =>
+                    authClient.signIn.social({
+                      provider: "google",
+                      callbackURL: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+                    })
+                  }
+                >
                   Login with Google
                 </Button>
 
