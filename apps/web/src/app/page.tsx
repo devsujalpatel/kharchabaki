@@ -64,8 +64,6 @@ export default function Home() {
     ],
   ] as const;
 
-  
-
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
       <section className="relative border-b border-white/7">
@@ -90,16 +88,24 @@ export default function Home() {
               FAQ
             </a>
           </div>
-          <div className="hidden items-center gap-3 md:flex">
-            <Link href="/signin">
+          <div className="hidden items-center  md:flex">
+            <Link href="/auth/signin">
               <Button
                 variant="ghost"
                 className="text-muted-foreground hover:bg-white/5 hover:text-white"
               >
-                Sign in
+                Log in
               </Button>
             </Link>
-            <Link href={"/dashboard"}>
+            <Link href="/auth/signup">
+              <Button
+                variant="ghost"
+                className="text-muted-foreground hover:bg-white/5 hover:text-white"
+              >
+                Sign up
+              </Button>
+            </Link>
+            <Link href={"/dashboard"} className="ml-4">
               <Button className="" variant={"primary"}>
                 Start for free <ArrowRight />
               </Button>
@@ -155,16 +161,17 @@ export default function Home() {
                     </motion.a>
                   ),
                 )}
-
                 <motion.div
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 4 }}
                   transition={{ duration: 0.2, delay: 0.1 }}
                 >
-                  <Button className="mt-2 w-full" variant={"primary"}>
-                    Start for free
-                  </Button>
+                  <Link href="/dashboard">
+                    <Button className="mt-2 w-full" variant={"primary"}>
+                      Start for free
+                    </Button>
+                  </Link>
                 </motion.div>
               </motion.div>
             )}
@@ -188,21 +195,24 @@ export default function Home() {
             <Link href="/dashboard">
               <Button
                 size="lg"
-                className="h-12 bg-primary px-5 font-semibold text-muted hover:bg-primary/80"
+                className="h-12 bg-primary px-5 font-semibold text-muted hover:bg-primary/80 w-52 sm:w-55"
               >
                 Start tracking for free <ArrowRight />
               </Button>
             </Link>
-            <Button
-              size="lg"
-              variant="outline"
-              className="h-12 border-white/15 bg-white/3 px-5 text-white hover:bg-white/8 hover:text-foreground"
-            >
-              <span className="grid size-5 place-items-center rounded-full bg-white text-[9px] text-black">
-                ▶
-              </span>{" "}
-              See how it works
-            </Button>
+
+            <Link href="/dashboard">
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-12 border-white/15 bg-white/3 px-5 text-white hover:bg-white/8 hover:text-foreground w-52"
+              >
+                <span className="grid size-5 place-items-center rounded-full bg-white text-[9px] text-black">
+                  ▶
+                </span>{" "}
+                See how it works
+              </Button>
+            </Link>
           </div>
           <div className="mt-5 flex items-center justify-center gap-2 text-xs text-[#8e9789]">
             <Check className="size-3.5 text-muted-foreground" />

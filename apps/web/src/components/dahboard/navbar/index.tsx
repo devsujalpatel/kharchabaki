@@ -48,7 +48,7 @@ export function Navbar() {
 
   const handleSignOut = async () => {
     await authClient.signOut();
-    router.push("/signin");
+    router.push("/auth/signin");
   };
 
   return (
