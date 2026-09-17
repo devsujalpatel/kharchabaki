@@ -28,6 +28,10 @@ export const auth = betterAuth({
   trustedOrigins: ['https://kharchabaki.vercel.app'],
 
   advanced: {
+    defaultCookieAttributes: {
+      sameSite: 'none',
+      secure: true,
+    },
     ipAddress: {
       ipAddressHeaders: ['cf-connecting-ip'],
     },

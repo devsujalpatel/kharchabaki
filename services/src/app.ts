@@ -9,6 +9,7 @@ import { toNodeHandler } from 'better-auth/node';
 import { auth } from './lib/auth.js';
 import helmet from 'helmet';
 import { env } from './config/env.js';
+import cookieParser from 'cookie-parser';
 
 export const app = express();
 
@@ -16,7 +17,7 @@ app.disable('x-powered-by');
 
 const acceptedOrigins = [env.webUrl, env.appUrl];
 
-app.use(helmet());
+// app.use(helmet());
 
 app.use(
   cors({
@@ -26,11 +27,13 @@ app.use(
   }),
 );
 
-app.get("/debug/headers", (req, res) => {
+app.use(cookieParser());
+
+app.get('/debug/headers', (req, res) => {
   res.json({
-    forwardedFor: req.headers["x-forwarded-for"],
-    realIp: req.headers["x-real-ip"],
-    cfConnectingIp: req.headers["cf-connecting-ip"],
+    forwardedFor: req.headers['x-forwarded-for'],
+    realIp: req.headers['x-real-ip'],
+    cfConnectingIp: req.headers['cf-connecting-ip'],
   });
 });
 
@@ -46,7 +49,6 @@ app.get('/', (_request, response) => {
   };
   response.status(200).json(body);
 });
-
 
 app.use(API_PREFIX, apiRouter);
 app.use(notFoundHandler);
