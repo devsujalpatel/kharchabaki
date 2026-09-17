@@ -17,7 +17,7 @@ app.disable('x-powered-by');
 
 const acceptedOrigins = [env.webUrl, env.appUrl];
 
-// app.use(helmet());
+app.use(helmet());
 
 app.use(
   cors({

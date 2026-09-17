@@ -2,12 +2,11 @@ import { adminClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000",
+  baseURL: "https://kharchabaki.onrender.com",
   fetchOptions: {
-    credentials: "include"
+    credentials: "include",
   },
   plugins: [adminClient()],
 });
-
 
 export const { useSession } = authClient;
