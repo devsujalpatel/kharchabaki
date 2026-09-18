@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 
 const loginSchema = z.object({
   email: z.email("Enter a valid email address"),
@@ -45,7 +45,8 @@ export function LoginForm({
     },
   });
 
-  const router = useRouter();
+  const sleep = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
 
   const handleSubmit = async (values: LoginFormValues) => {
     try {
@@ -60,10 +61,8 @@ export function LoginForm({
       }
 
       toast.success("Login successful");
-      setTimeout(() => {
-        console.log("timeout fired");
-        router.push("/dashboard");
-      }, 3000);
+      await sleep(3000);
+      redirect("/dashboard");
     } catch {
       toast.error("Something went wrong. Please try again.");
     }
