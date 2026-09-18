@@ -391,6 +391,7 @@ function formatDate(value: string) {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: "UTC",
   }).format(new Date(value));
 }
 

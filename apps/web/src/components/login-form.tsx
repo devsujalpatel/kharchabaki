@@ -87,6 +87,7 @@ export function LoginForm({
                   type="email"
                   placeholder="email@example.com"
                   {...form.register("email")}
+                  disabled={form.formState.isSubmitting}
                 />
 
                 {form.formState.errors.email && (
@@ -112,6 +113,7 @@ export function LoginForm({
                   id="password"
                   type="password"
                   {...form.register("password")}
+                  disabled={form.formState.isSubmitting}
                 />
 
                 {form.formState.errors.password && (
@@ -138,6 +140,7 @@ export function LoginForm({
                       callbackURL: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
                     })
                   }
+                  disabled
                 >
                   Login with Google
                 </Button>

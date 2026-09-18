@@ -13,8 +13,6 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-import { Button } from "@/components/ui/button";
-
 export const NavigationBreadcrumb = () => {
   const pathname = usePathname();
 
@@ -34,11 +32,13 @@ export const NavigationBreadcrumb = () => {
   return (
     <div className="flex items-center mt-2">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="size-8">
-          <Link href="/dashboard" aria-label="Go back to dashboard">
-            <ChevronLeft className="size-4" />
-          </Link>
-        </Button>
+        <Link
+          href="/dashboard"
+          aria-label="Go back to dashboard"
+          className="inline-flex size-8 items-center justify-center rounded-lg hover:bg-muted"
+        >
+          <ChevronLeft className="size-4" />
+        </Link>
 
         <Breadcrumb>
           <BreadcrumbList>

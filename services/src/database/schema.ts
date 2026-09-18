@@ -203,7 +203,7 @@ export const takenLoan = pgTable(
     }).notNull(),
 
     borrowedFrom: text('borrowed_from').notNull(),
-    dueData: timestamp('due_date').notNull(),
+    dueDate: timestamp('due_date').notNull(),
     status: loanStatusEnum('status').default('active').notNull(),
     paidAmount: decimal('paid_amount', {
       precision: 19,
@@ -218,6 +218,10 @@ export const takenLoan = pgTable(
     })
       .default('0.00')
       .notNull(),
+    totalAmount: decimal('total_amount', {
+      precision: 19,
+      scale: 2,
+    }).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
       .defaultNow()
@@ -226,7 +230,7 @@ export const takenLoan = pgTable(
   },
   (table) => [
     index('taken_loan_user_id_idx').on(table.userId),
-    index('taken_loan_due_date_idx').on(table.dueData),
+    index('taken_loan_due_date_idx').on(table.dueDate),
   ],
 );
 
@@ -234,7 +238,7 @@ export const takenLoan = pgTable(
 export const loanPayment = pgTable(
   'loan_payment',
   {
-    id: uuid('id').defaultRandom().notNull(),
+    id: uuid('id').defaultRandom().primaryKey(),
     loanId: uuid('loan_id')
       .notNull()
       .references(() => takenLoan.id, {
@@ -273,10 +277,14 @@ export const givenLoan = pgTable(
     dueDate: timestamp('due_date').notNull(),
     interest: decimal('interest', {
       precision: 7,
-      scale: 22,
+      scale: 2,
     })
       .default('0.00')
       .notNull(),
+    totalAmount: decimal('total_amount', {
+      precision: 19,
+      scale: 2,
+    }).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
       .defaultNow()

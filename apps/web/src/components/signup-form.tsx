@@ -91,6 +91,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 type="text"
                 placeholder="John Doe"
                 {...form.register("name")}
+                disabled={form.formState.isSubmitting}
               />
 
               {form.formState.errors.name && (
@@ -109,6 +110,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 type="email"
                 placeholder="m@example.com"
                 {...form.register("email")}
+                disabled={form.formState.isSubmitting}
               />
 
               {form.formState.errors.email ? (
@@ -131,6 +133,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 id="password"
                 type="password"
                 {...form.register("password")}
+                disabled={form.formState.isSubmitting}
               />
 
               {form.formState.errors.password ? (
@@ -154,6 +157,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 id="confirm-password"
                 type="password"
                 {...form.register("confirmPassword")}
+                disabled={form.formState.isSubmitting}
               />
 
               {form.formState.errors.confirmPassword ? (
@@ -187,6 +191,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                       callbackURL: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
                     })
                   }
+                  disabled
                 >
                   Sign up with Google
                 </Button>

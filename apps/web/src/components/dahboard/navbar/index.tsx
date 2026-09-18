@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Receipt, User, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Receipt, User, Settings, LogOut, HandCoins } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +26,11 @@ const navigation = [
     label: "Transactions",
     href: "/dashboard/transactions",
     icon: Receipt,
+  },
+  {
+    label: "Loans",
+    href: "/dashboard/loans",
+    icon: HandCoins,
   },
 ];
 
@@ -76,12 +80,12 @@ export function Navbar() {
               pathname === item.href || pathname.startsWith(`${item.href}/`);
 
             return (
-              <Button
+              <Link
                 key={item.href}
-                variant="ghost"
-                size="sm"
+                href={item.href}
+                prefetch
                 className={`
-                  h-9 rounded-xl px-2
+                  inline-flex h-9 items-center justify-center gap-1 rounded-xl px-2 text-sm font-medium
                   transition-all duration-200
                   ${
                     isActive
@@ -90,15 +94,9 @@ export function Navbar() {
                   }
                 `}
               >
-                <Link
-                  href={item.href}
-                  prefetch
-                  className="flex items-center justify-center gap-1"
-                >
-                  <Icon className="size-4" />
-                  <span className="hidden sm:inline">{item.label}</span>
-                </Link>
-              </Button>
+                <Icon className="size-4" />
+                <span className="hidden sm:inline">{item.label}</span>
+              </Link>
             );
           })}
         </nav>
@@ -106,27 +104,21 @@ export function Navbar() {
         {/* User */}
         <div className="ml-auto">
           <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button
-                variant="ghost"
-                className="
-                  size-10 rounded-xl p-1
-                  transition-all duration-200
-                  hover:bg-muted
-                "
-              >
-                <Avatar className="size-8 rounded-lg">
-                  <AvatarImage
-                    src={user?.image ?? undefined}
-                    alt={user?.name ?? "User"}
-                    className="rounded-lg"
-                  />
+            <DropdownMenuTrigger
+              className="size-10 rounded-xl p-1 transition-all duration-200 hover:bg-muted"
+              aria-label="Open user menu"
+            >
+              <Avatar className="size-8 rounded-lg">
+                <AvatarImage
+                  src={user?.image ?? undefined}
+                  alt={user?.name ?? "User"}
+                  className="rounded-lg"
+                />
 
-                  <AvatarFallback className="rounded-lg text-xs">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
+                <AvatarFallback className="rounded-lg text-xs">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
             </DropdownMenuTrigger>
 
             <DropdownMenuContent

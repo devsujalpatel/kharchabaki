@@ -12,6 +12,7 @@ import { transactionRouter } from '../modules/transactions/transaction.route.js'
 import { incomeRouter } from '../modules/income/income.route.js';
 import { expenseRouter } from '../modules/expense/expense.route.js';
 import { summaryRouter } from '../modules/summary/summary.route.js';
+import { loanRouter } from '../modules/loan/loan.route.js';
 
 export const apiRouter = Router();
 
@@ -42,3 +43,4 @@ apiRouter.use(checkAuth, transactionRouter);
 apiRouter.use(checkAuth, incomeRouter);
 apiRouter.use(checkAuth, expenseRouter);
 apiRouter.use(checkAuth, summaryRouter);
+apiRouter.use(checkAuth, loanRouter);

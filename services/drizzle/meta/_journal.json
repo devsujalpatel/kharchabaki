@@ -43,6 +43,20 @@
       "when": 1789573014024,
       "tag": "0005_productive_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789725362290,
+      "tag": "0006_cuddly_robin_chapel",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789729890041,
+      "tag": "0007_mysterious_scream",
+      "breakpoints": true
     }
   ]
 }
