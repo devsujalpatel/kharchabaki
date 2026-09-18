@@ -80,7 +80,7 @@ export default function LoansPage() {
   const hasError = takenLoansQuery.isError || givenLoansQuery.isError;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Loans</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -295,8 +295,7 @@ function LoanRow({
         <div>
           <p className="font-medium">{person}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Due {formatDate(loan.dueDate)} · {loan.interest}
-            % interest
+            Due {formatDate(loan.dueDate)} · {loan.interest}% interest
           </p>
         </div>
         <span

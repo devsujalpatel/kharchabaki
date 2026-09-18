@@ -77,7 +77,7 @@ export function Navbar() {
             const Icon = item.icon;
 
             const isActive =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+              pathname === item.href || pathname.startsWith(`${item.href}/dashboard`);
 
             return (
               <Link
