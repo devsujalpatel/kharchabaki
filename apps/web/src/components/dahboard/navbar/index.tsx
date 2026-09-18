@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Receipt, User, Settings, LogOut, HandCoins } from "lucide-react";
+import {
+  LayoutDashboard,
+  Receipt,
+  User,
+  Settings,
+  LogOut,
+  HandCoins,
+} from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
 
@@ -77,7 +84,8 @@ export function Navbar() {
             const Icon = item.icon;
 
             const isActive =
-              pathname === item.href || pathname.startsWith(`${item.href}/dashboard`);
+              pathname === item.href ||
+              pathname.startsWith(`${item.href}/dashboard`);
 
             return (
               <Link

@@ -10,39 +10,37 @@ export async function proxy(request: NextRequest) {
 
   const isProtectedRoute = pathname.startsWith("/dashboard");
 
-  // Only check auth for routes we care about
   if (!isAuthRoute && !isProtectedRoute) {
     return NextResponse.next();
   }
-
-  let isAuthenticated = false;
 
   try {
     const response = await fetch(`${API_URL}/api/v1/me`, {
       method: "GET",
       headers: {
-        cookie: request.headers.get("cookie") ?? "",
+        Cookie: request.headers.get("cookie") ?? "",
       },
       cache: "no-store",
     });
 
-    if (response.ok) {
-      const data = await response.json();
+    const data = response.ok ? await response.json() : null;
 
-      isAuthenticated = data.success !== false && !!data?.data?.session;
+    const isAuthenticated =
+      response.ok && data?.success !== false && !!data?.data?.session;
+
+    if (isAuthenticated && isAuthRoute) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-  } catch {
-    isAuthenticated = false;
-  }
 
-  // Logged-in user trying to access signin/signup
-  if (isAuthenticated && isAuthRoute) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
+    if (!isAuthenticated && isProtectedRoute) {
+      return NextResponse.redirect(new URL("/auth/signin", request.url));
+    }
+  } catch (error) {
+    console.error("Auth check failed:", error);
 
-  // Logged-out user trying to access dashboard
-  if (!isAuthenticated && isProtectedRoute) {
-    return NextResponse.redirect(new URL("/auth/signin", request.url));
+    if (isProtectedRoute) {
+      return NextResponse.redirect(new URL("/auth/signin", request.url));
+    }
   }
 
   return NextResponse.next();
