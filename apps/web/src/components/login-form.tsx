@@ -24,7 +24,6 @@ import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import Link from "next/link";
-import { redirect, useRouter } from "next/navigation";
 
 const loginSchema = z.object({
   email: z.email("Enter a valid email address"),

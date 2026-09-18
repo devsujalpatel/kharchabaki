@@ -29,6 +29,11 @@ export const auth = betterAuth({
 
   trustedOrigins: [env.webUrl, env.betterAuthUrl],
   advanced: {
+    defaultCookieAttributes: {
+      sameSite: 'none',
+      secure: true,
+      httpOnly: true,
+    },
     ipAddress: {
       ipAddressHeaders: ['cf-connecting-ip'],
     },
