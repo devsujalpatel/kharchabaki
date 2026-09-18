@@ -45,6 +45,7 @@ export function LoginForm({
     },
   });
 
+  const router = useRouter();
 
   const handleSubmit = async (values: LoginFormValues) => {
     try {
@@ -59,8 +60,9 @@ export function LoginForm({
       }
 
       toast.success("Login successful");
-
-      window.location.href = "/dashboard";
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 3000);
     } catch {
       toast.error("Something went wrong. Please try again.");
     }
