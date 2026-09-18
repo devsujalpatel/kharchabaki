@@ -45,9 +45,6 @@ export function LoginForm({
     },
   });
 
-  const sleep = (ms: number) =>
-    new Promise((resolve) => setTimeout(resolve, ms));
-
   const handleSubmit = async (values: LoginFormValues) => {
     try {
       const { error } = await authClient.signIn.email({
@@ -61,8 +58,6 @@ export function LoginForm({
       }
 
       toast.success("Login successful");
-      await sleep(3000);
-      redirect("/dashboard");
     } catch {
       toast.error("Something went wrong. Please try again.");
     }
