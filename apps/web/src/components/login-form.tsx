@@ -58,9 +58,10 @@ export function LoginForm({
         toast.error(error.message);
         return;
       }
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      toast.success("Login successful");
       router.push("/dashboard");
+      router.refresh();
     } catch {
       toast.error("Something went wrong. Please try again.");
     }
