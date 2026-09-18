@@ -29,11 +29,6 @@ export const auth = betterAuth({
 
   trustedOrigins: [env.webUrl, env.betterAuthUrl],
   advanced: {
-    crossSubDomainCookies: {
-      enabled: true,
-      domain: '.vercela.app',
-    },
-    useSecureCookies: false,
     ipAddress: {
       ipAddressHeaders: ['cf-connecting-ip'],
     },
