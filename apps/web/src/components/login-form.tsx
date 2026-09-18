@@ -61,6 +61,7 @@ export function LoginForm({
 
       toast.success("Login successful");
       setTimeout(() => {
+        console.log("timeout fired");
         router.push("/dashboard");
       }, 3000);
     } catch {
