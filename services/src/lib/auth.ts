@@ -32,7 +32,9 @@ export const auth = betterAuth({
     env.webUrl,
     env.betterAuthUrl,
     'kharchabaki://',
-    ...(process.env.NODE_ENV !== 'production' ? ['exp://'] : []),
+    'exp://',
+    'exp://**',
+    'exp://192.168.*.*:*/**',
   ],
   advanced: {
     defaultCookieAttributes: {
