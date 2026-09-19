@@ -28,7 +28,12 @@ export const auth = betterAuth({
     },
   },
 
-  trustedOrigins: [env.webUrl, env.betterAuthUrl, "kharchabaki://"],
+  trustedOrigins: [
+    env.webUrl,
+    env.betterAuthUrl,
+    'kharchabaki://',
+    'kharchabaki://*',
+  ],
   advanced: {
     defaultCookieAttributes: {
       sameSite: 'lax',
