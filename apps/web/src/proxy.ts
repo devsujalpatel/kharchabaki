@@ -1,44 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
 
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isAuthRoute =
-    pathname === "/auth/signin" || pathname === "/auth/signup";
+  console.log("========== PROXY ==========");
+  console.log("PATH:", pathname);
+  console.log("COOKIE:", request.headers.get("cookie"));
+  console.log("API URL:", API_URL);
 
-  const isProtectedRoute = pathname.startsWith("/dashboard");
+  if (pathname.startsWith("/dashboard")) {
+    console.log("CALLING ME...");
 
-  if (!isAuthRoute && !isProtectedRoute) {
-    return NextResponse.next();
-  }
+    try {
+      const cookie = request.headers.get("cookie");
 
-  try {
-    const response = await fetch(`${API_URL}/api/v1/me`, {
-      method: "GET",
-      headers: {
-        Cookie: request.headers.get("cookie") ?? "",
-      },
-      cache: "no-store",
-    });
+      const response = await fetch(`${API_URL}/api/v1/me`, {
+        method: "GET",
+        headers: cookie
+          ? {
+              Cookie: cookie,
+            }
+          : {},
+        cache: "no-store",
+      });
 
-    const data = response.ok ? await response.json() : null;
+      console.log("ME STATUS:", response.status);
 
-    const isAuthenticated =
-      response.ok && data?.success !== false && !!data?.data?.session;
+      const text = await response.text();
 
-    if (isAuthenticated && isAuthRoute) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
+      console.log("ME RESPONSE:", text);
 
-    if (!isAuthenticated && isProtectedRoute) {
-      return NextResponse.redirect(new URL("/auth/signin", request.url));
-    }
-  } catch (error) {
-    console.error("Auth check failed:", error);
+      if (!response.ok) {
+        console.log("NOT AUTHENTICATED");
+        return NextResponse.redirect(new URL("/auth/signin", request.url));
+      }
 
-    if (isProtectedRoute) {
+      console.log("AUTHENTICATED");
+      return NextResponse.next();
+    } catch (error) {
+      console.error("ME FETCH FAILED:", error);
+
       return NextResponse.redirect(new URL("/auth/signin", request.url));
     }
   }
@@ -47,5 +51,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/auth/signin", "/auth/signup"],
+  matcher: ["/dashboard/:path*"],
 };

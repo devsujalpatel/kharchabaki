@@ -9,9 +9,14 @@ export const checkAuth = async (
   next: NextFunction,
 ) => {
   try {
+    console.log('CHECK AUTH HIT');
+    console.log('COOKIE:', request.headers.cookie);
+
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(request.headers),
     });
+
+    console.log('SESSION:', session);
 
     if (!session) {
       throw new ApiError(401, 'Unauthorized');
@@ -22,6 +27,7 @@ export const checkAuth = async (
 
     next();
   } catch (error) {
+    console.error('CHECK AUTH ERROR:', error);
     next(error);
   }
 };

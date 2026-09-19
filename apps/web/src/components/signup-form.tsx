@@ -191,7 +191,6 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                       callbackURL: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
                     })
                   }
-                  disabled
                 >
                   Sign up with Google
                 </Button>

@@ -16,7 +16,6 @@ import { loanRouter } from '../modules/loan/loan.route.js';
 
 export const apiRouter = Router();
 
-
 //health
 apiRouter.get('/health', (_request, response) => {
   const body: ApiResponse<{
@@ -35,9 +34,21 @@ apiRouter.get('/health', (_request, response) => {
   response.status(200).json(body);
 });
 
+apiRouter.use((request, _response, next) => {
+  console.log(
+    'API ROUTER:',
+    request.method,
+    request.originalUrl,
+    'COOKIE:',
+    request.headers.cookie,
+  );
+
+  next();
+});
+
+apiRouter.use(authRouter);
 
 // protected routes
-apiRouter.use(checkAuth, authRouter);
 apiRouter.use(checkAuth, balanceRouter);
 apiRouter.use(checkAuth, transactionRouter);
 apiRouter.use(checkAuth, incomeRouter);

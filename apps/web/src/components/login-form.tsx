@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const loginSchema = z.object({
   email: z.email("Enter a valid email address"),
@@ -43,20 +44,16 @@ export function LoginForm({
       password: "",
     },
   });
+  const router = useRouter();
 
   const handleSubmit = async (values: LoginFormValues) => {
     try {
-      const { error } = await authClient.signIn.email({
+      await authClient.signIn.email({
         email: values.email,
         password: values.password,
       });
-
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-
       toast.success("Login successful");
+      router.push("/dashboard");
     } catch {
       toast.error("Something went wrong. Please try again.");
     }
@@ -136,7 +133,6 @@ export function LoginForm({
                       callbackURL: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
                     })
                   }
-                  disabled
                 >
                   Login with Google
                 </Button>

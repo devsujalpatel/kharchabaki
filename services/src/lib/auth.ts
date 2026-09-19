@@ -30,8 +30,8 @@ export const auth = betterAuth({
   trustedOrigins: [env.webUrl, env.betterAuthUrl],
   advanced: {
     defaultCookieAttributes: {
-      sameSite: 'none',
-      secure: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
     },
     ipAddress: {
