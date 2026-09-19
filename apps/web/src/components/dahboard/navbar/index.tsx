@@ -175,7 +175,7 @@ export function Navbar() {
                 </Link>
               </DropdownMenuItem>
 
-              <DropdownMenuItem className="rounded-xl">
+              {/*<DropdownMenuItem className="rounded-xl">
                 <Link
                   href="/dashboard/settings"
                   className="w-full flex h-6 items-center gap-1"
@@ -183,7 +183,7 @@ export function Navbar() {
                   <Settings className="size-4" />
                   Settings
                 </Link>
-              </DropdownMenuItem>
+              </DropdownMenuItem>*/}
 
               <DropdownMenuSeparator className="my-2" />
 
