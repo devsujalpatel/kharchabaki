@@ -8,7 +8,10 @@ import { env } from '../config/env.js';
 import { expo } from '@better-auth/expo';
 
 export const auth = betterAuth({
-  baseURL: env.betterAuthUrl,
+  baseURL: {
+    allowedHosts: [env.betterAuthUrl, env.appUrl],
+    protocol: process.env.NODE_ENV === 'production' ? 'https' : 'http',
+  },
   basePath: '/api/auth',
   emailAndPassword: {
     enabled: true,
