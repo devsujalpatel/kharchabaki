@@ -5,6 +5,7 @@ import 'dotenv/config';
 import * as schema from '../database/schema.js';
 import { db } from '../database/client.js';
 import { env } from '../config/env.js';
+import { expo } from '@better-auth/expo';
 
 export const auth = betterAuth({
   baseURL: env.betterAuthUrl,
@@ -18,7 +19,7 @@ export const auth = betterAuth({
     schema,
   }),
 
-  plugins: [admin()],
+  plugins: [admin(), expo()],
 
   socialProviders: {
     google: {
@@ -27,7 +28,7 @@ export const auth = betterAuth({
     },
   },
 
-  trustedOrigins: [env.webUrl, env.betterAuthUrl],
+  trustedOrigins: [env.webUrl, env.betterAuthUrl, "kharchabaki://"],
   advanced: {
     defaultCookieAttributes: {
       sameSite: 'lax',

@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Receipt,
   User,
-  Settings,
   LogOut,
   HandCoins,
 } from "lucide-react";
