@@ -97,14 +97,14 @@ export default function Home() {
                 Log in
               </Button>
             </Link>
-            <Link href="/auth/signup">
+            {/*<Link href="/auth/signup">
               <Button
                 variant="ghost"
                 className="text-muted-foreground hover:bg-white/5 hover:text-white"
               >
                 Sign up
               </Button>
-            </Link>
+            </Link>*/}
             <Link href={"/dashboard"} className="ml-4">
               <Button className="" variant={"primary"}>
                 Start for free <ArrowRight />

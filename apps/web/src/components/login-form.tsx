@@ -15,15 +15,15 @@ import {
 } from "@/components/ui/card";
 import {
   Field,
-  FieldDescription,
+  // FieldDescription,
   FieldGroup,
-  FieldLabel,
-  FieldSeparator,
+  // FieldLabel,
+  // FieldSeparator,
 } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+// import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
-import Link from "next/link";
+// import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 const loginSchema = z.object({
@@ -63,16 +63,14 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6 min-w-90", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle>Login to your account</CardTitle>
-          <CardDescription>
-            Enter your email below to login to your account
-          </CardDescription>
+          <CardTitle>Welcome to kharchabaki</CardTitle>
+          <CardDescription>Login to use the feature</CardDescription>
         </CardHeader>
 
         <CardContent>
           <form onSubmit={form.handleSubmit(handleSubmit)}>
             <FieldGroup>
-              <Field>
+              {/*<Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
 
                 <Input
@@ -88,9 +86,9 @@ export function LoginForm({
                     {form.formState.errors.email.message}
                   </FieldDescription>
                 )}
-              </Field>
+              </Field>*/}
 
-              <Field>
+              {/*<Field>
                 <div className="flex items-center">
                   <FieldLabel htmlFor="password">Password</FieldLabel>
 
@@ -114,16 +112,16 @@ export function LoginForm({
                     {form.formState.errors.password.message}
                   </FieldDescription>
                 )}
-              </Field>
+              </Field>*/}
 
               <Field>
-                <Button type="submit" disabled={form.formState.isSubmitting}>
+                {/*<Button type="submit" disabled={form.formState.isSubmitting}>
                   {form.formState.isSubmitting ? "Logging in..." : "Login"}
-                </Button>
+                </Button>*/}
 
-                <FieldSeparator className="my-2">
+                {/*<FieldSeparator className="my-2">
                   Or continue with
-                </FieldSeparator>
+                </FieldSeparator>*/}
                 <Button
                   variant="outline"
                   type="button"
@@ -138,7 +136,7 @@ export function LoginForm({
                   Login with Google
                 </Button>
 
-                <FieldDescription className="text-center">
+                {/*<FieldDescription className="text-center">
                   Don&apos;t have an account?{" "}
                   <Link
                     href="/auth/signup"
@@ -146,7 +144,7 @@ export function LoginForm({
                   >
                     Sign up
                   </Link>
-                </FieldDescription>
+                </FieldDescription>*/}
               </Field>
             </FieldGroup>
           </form>
