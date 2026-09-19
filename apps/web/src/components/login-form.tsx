@@ -130,7 +130,8 @@ export function LoginForm({
                   onClick={() =>
                     authClient.signIn.social({
                       provider: "google",
-                      callbackURL: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+                      callbackURL: `${window.location.origin}/dashboard`,
+                      errorCallbackURL: `${window.location.origin}/auth/signin`,
                     })
                   }
                 >

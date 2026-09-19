@@ -5,13 +5,9 @@ import { ApiError } from '../../utils/api-error.js';
 import { ApiResponse } from '../../types/common.types.js';
 
 export const getUserSession = async (request: Request, response: Response) => {
-  console.log('BACKEND COOKIE:', request.headers.cookie);
-
   const session = await auth.api.getSession({
     headers: fromNodeHeaders(request.headers),
   });
-
-  console.log('SESSION:', session);
 
   if (!session) {
     throw new ApiError(401, 'Unauthorized');
