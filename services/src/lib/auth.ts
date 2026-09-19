@@ -32,7 +32,6 @@ export const auth = betterAuth({
     env.webUrl,
     env.betterAuthUrl,
     'kharchabaki://',
-    'kharchabaki://*',
   ],
   advanced: {
     defaultCookieAttributes: {
