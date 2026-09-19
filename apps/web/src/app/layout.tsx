@@ -19,9 +19,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kharchabaki",
-  description:
-    "This is a imcome/expense and all types of finance managment platform",
+  title: "KharchaBaki",
+  description: "Manage your personal finances",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "KharchaBaki",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
