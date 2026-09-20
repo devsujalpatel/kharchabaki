@@ -36,11 +36,11 @@ export const auth = betterAuth({
     'exp://192.168.*.*:*/**',
   ],
   advanced: {
-    defaultCookieAttributes: {
-      sameSite: 'none',
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-    },
+    // defaultCookieAttributes: {
+    //   sameSite: 'none',
+    //   secure: process.env.NODE_ENV === 'production',
+    //   httpOnly: true,
+    // },
     ipAddress: {
       ipAddressHeaders: ['cf-connecting-ip'],
     },
