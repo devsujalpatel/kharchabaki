@@ -23,6 +23,7 @@
     "better-auth": "^1.7.5",
     "expo": "~57.0.18",
     "expo-constants": "~57.0.16",
+    "expo-dev-client": "~57.0.19",
     "expo-linking": "~57.0.8",
     "expo-network": "^57.0.2",
     "expo-router": "~57.0.17",
