@@ -10,6 +10,7 @@ import { auth } from './lib/auth.js';
 import helmet from 'helmet';
 import { env } from './config/env.js';
 import cookieParser from 'cookie-parser';
+import { rateLimit } from 'express-rate-limit';
 
 const app = express();
 
@@ -17,6 +18,15 @@ app.disable('x-powered-by');
 
 const acceptedOrigins = [env.webUrl, env.appUrl];
 
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 100,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  ipv6Subnet: 56,
+});
+
+app.use(limiter);
 app.use(helmet());
 
 app.use(

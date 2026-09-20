@@ -38,6 +38,7 @@
     "expo-network": "^57.0.2",
     "expo-web-browser": "^57.0.3",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
     "pg": "^8.23.0",
     "ws": "^8.21.3",
