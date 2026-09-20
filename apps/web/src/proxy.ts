@@ -26,6 +26,7 @@ export async function proxy(request: NextRequest) {
             Cookie: cookie,
           }
         : {},
+      credentials: "include",
       cache: "no-store",
     });
 
