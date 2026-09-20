@@ -20,6 +20,7 @@ export async function api<T>(
       Cookie: cookieStore.toString(),
       ...options?.headers,
     },
+    credentials: "include",
   });
 
   if (!response.ok) {
