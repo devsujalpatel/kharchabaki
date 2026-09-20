@@ -34,17 +34,6 @@ apiRouter.get('/health', (_request, response) => {
   response.status(200).json(body);
 });
 
-apiRouter.use((request, _response, next) => {
-  console.log(
-    'API ROUTER:',
-    request.method,
-    request.originalUrl,
-    'COOKIE:',
-    request.headers.cookie,
-  );
-
-  next();
-});
 
 apiRouter.use(authRouter);
 

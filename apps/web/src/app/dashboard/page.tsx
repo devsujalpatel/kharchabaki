@@ -69,16 +69,6 @@ type IncomeForm = {
 export default function Dashboard() {
   const queryClient = useQueryClient();
 
-  /*
-   * These should be backed by your API.
-   *
-   * Example:
-   * GET /income/summary
-   * GET /expense/summary
-   *
-   * For now, they can be fetched from your dashboard endpoint.
-   */
-
   const incomeForm = useForm<IncomeForm>({
     defaultValues: {
       amount: 0,
@@ -166,7 +156,7 @@ export default function Dashboard() {
     queryFn: dashboardSummaryQuery,
   });
 
-  console.log(summary)
+  console.log(summary);
 
   const balance = Number(summary?.data.balance ?? 0);
   const income = Number(summary?.data.income ?? 0);
