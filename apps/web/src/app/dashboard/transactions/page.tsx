@@ -229,7 +229,7 @@ export default function TransactionsPage() {
       </Card>
 
       {/* Transactions */}
-      <Card className="rounded-2xl">
+      <Card className="rounded-2xl mb-20 sm:mb-0">
         <CardHeader className="border-b">
           <CardTitle className="text-base">Transaction history</CardTitle>
         </CardHeader>

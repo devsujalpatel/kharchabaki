@@ -78,7 +78,7 @@ export default function ProfileDashboard() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-4xl p-6">
+    <main className="mx-auto w-full max-w-4xl p-2 sm:p-6">
       <div className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
 
@@ -138,7 +138,7 @@ export default function ProfileDashboard() {
         </Card>
 
         {/* Balance */}
-        <Card>
+        <Card className="mb-15 sm:mb-0">
           <CardHeader>
             <CardTitle>Balance</CardTitle>
 

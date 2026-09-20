@@ -336,7 +336,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Expense */}
-        <Card className="rounded-2xl">
+        <Card className="rounded-2xl mb-20 sm:mb-0">
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="flex size-9 items-center justify-center rounded-xl bg-red-500/10 text-red-600">

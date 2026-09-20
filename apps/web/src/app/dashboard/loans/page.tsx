@@ -200,7 +200,7 @@ export default function LoansPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2 mb-20 sm:mb-0">
           <LoanList kind="taken" loans={takenLoans} onRefresh={refreshLoans} />
           <LoanList kind="given" loans={givenLoans} onRefresh={refreshLoans} />
         </div>

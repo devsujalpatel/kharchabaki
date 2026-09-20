@@ -79,7 +79,7 @@ export function Navbar() {
             bg-background/75 px-2
             shadow-lg shadow-black/5
             backdrop-blur-xl
-            supports-[backdrop-filter]:bg-background/60
+            supports-backdrop-filter:bg-background/60
           "
         >
           {/* Brand */}
