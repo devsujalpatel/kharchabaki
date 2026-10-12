@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Uniwind } from "uniwind";
 import { StatusBar } from "expo-status-bar";
 import { api } from "@/lib/api";
-import { authClient } from "@/lib/auth-client";
+import { useAppSession } from "@/lib/session-provider";
 import { formatCurrency, palettes, type Preferences } from "@/lib/finance";
 
 async function request(method: string, input?: Partial<Preferences>): Promise<Preferences> {
@@ -17,7 +17,7 @@ async function request(method: string, input?: Partial<Preferences>): Promise<Pr
 }
 function useAccountPreferences() {
   const client = useQueryClient();
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAppSession();
   const key = ["preferences", session?.user.id];
   const query = useQuery({ queryKey: key, queryFn: () => request("GET"), enabled: !!session });
   const mutation = useMutation({

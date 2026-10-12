@@ -33,7 +33,7 @@ export async function proxy(request: NextRequest) {
     const isAuthenticated = response.ok;
 
     // Protected route + not logged in
-    if (isProtectedRoute && !isAuthenticated) {
+    if (isProtectedRoute && response.status === 401) {
       return NextResponse.redirect(new URL("/auth/signin", request.url));
     }
 
@@ -43,14 +43,9 @@ export async function proxy(request: NextRequest) {
     }
 
     return NextResponse.next();
-  } catch (error) {
-    console.error("ME FETCH FAILED:", error);
-
-    // If we can't verify authentication, treat the user as logged out
-    if (isProtectedRoute) {
-      return NextResponse.redirect(new URL("/auth/signin", request.url));
-    }
-
+  } catch {
+    // The dashboard is a client shell. Its session guard verifies access; API
+    // data remains protected on the service. An outage must not erase offline access.
     return NextResponse.next();
   }
 }

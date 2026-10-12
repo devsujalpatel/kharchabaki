@@ -1,8 +1,9 @@
 "use client";
+import { useOfflineStatus } from "@/components/providers/session-provider";
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { authClient } from "@/lib/auth-client";
+import { useAppSession } from "@/components/providers/session-provider";
 import { addBalance, balanceQuery } from "@/server/balance";
 
 import { PreferencesSettings } from "@/components/preferences-settings";
@@ -21,10 +22,10 @@ import { Separator } from "@/components/ui/separator";
 
 export default function ProfileDashboard() {
   const queryClient = useQueryClient();
+  const offline = useOfflineStatus();
   const { formatMoney } = usePreferences();
 
-  const { data: session, isPending: isSessionLoading } =
-    authClient.useSession();
+  const { data: session, isPending: isSessionLoading } = useAppSession();
 
   const {
     data: balanceData,
@@ -140,6 +141,11 @@ export default function ProfileDashboard() {
           </CardContent>
         </Card>
 
+        {(!offline.online || offline.pending > 0) && (
+          <p className="mt-4 text-xs text-muted-foreground">
+            Connect and finish syncing to change your opening balance.
+          </p>
+        )}
         {/* Balance */}
         <Card className="mb-15 sm:mb-0">
           <CardHeader>
@@ -191,7 +197,13 @@ export default function ProfileDashboard() {
 
               <Button
                 type="submit"
-                disabled={isUpdatingBalance || !amount || Number(amount) < 0}
+                disabled={
+                  !offline.online ||
+                  offline.pending > 0 ||
+                  isUpdatingBalance ||
+                  !amount ||
+                  Number(amount) < 0
+                }
                 className="w-full"
                 variant={"primary"}
               >

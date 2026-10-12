@@ -15,6 +15,7 @@ const amount = z
     'Use at most two decimal places',
   );
 const common = {
+  id: z.uuid().optional(),
   amount,
   description: z.string().trim().max(1000).optional(),
   occurredAt: z.iso.datetime().optional(),

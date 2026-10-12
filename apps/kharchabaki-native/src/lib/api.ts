@@ -1,19 +1,19 @@
-// lib/api.ts
-
-import { authClient } from "@/lib/auth-client";
-
-export async function api(path: string, init: RequestInit = {}) {
-  const headers = new Headers(init.headers);
-
-  const cookie = await authClient.getCookie();
-
-  if (cookie) {
-    headers.set("Cookie", cookie);
+import { offlineClient } from "./offline-client";
+import { ApiError } from "./offline-engine";
+// Preserve the Response interface used by existing mobile services.
+export async function api(path: string, init?: RequestInit): Promise<Response> {
+  try {
+    const result = await offlineClient.request(path, init);
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.status > 0)
+      return new Response(JSON.stringify({ success: false, message: error.message }), {
+        status: error.status,
+        headers: { "Content-Type": "application/json" },
+      });
+    throw error;
   }
-
-  return fetch(`${process.env.EXPO_PUBLIC_API_URL}${path}`, {
-    ...init,
-    headers,
-    credentials: "omit",
-  });
 }

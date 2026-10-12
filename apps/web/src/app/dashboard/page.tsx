@@ -1,5 +1,8 @@
 "use client";
 
+import { useAppSession } from "@/components/providers/session-provider";
+import { asObject } from "@/lib/offline-engine";
+import { toast } from "sonner";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -48,6 +51,7 @@ type IncomeForm = {
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
+  const { data: session } = useAppSession();
   const { formatMoney } = usePreferences();
   const [month, setMonth] = useState(currentMonth);
 
@@ -72,7 +76,8 @@ export default function Dashboard() {
   const incomeMutation = useMutation({
     mutationFn: addIncome,
 
-    onSuccess: () => {
+    onSuccess: (result) => {
+      toast.success(String(asObject(result).message ?? "Saved successfully"));
       incomeForm.reset();
 
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
@@ -89,7 +94,8 @@ export default function Dashboard() {
   const expenseMutation = useMutation({
     mutationFn: addExpense,
 
-    onSuccess: () => {
+    onSuccess: (result) => {
+      toast.success(String(asObject(result).message ?? "Saved successfully"));
       expenseForm.reset();
 
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
@@ -157,8 +163,13 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="sm:mt-20">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+      <div className="">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+          Hello, {session?.user.name.split(" ")[0] || "there"}
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+          Your money, in focus.
+        </h1>
 
         <p className="mt-1 text-sm text-muted-foreground">
           Keep track of your money without the noise.
@@ -167,7 +178,7 @@ export default function Dashboard() {
 
       <MonthPicker month={month} onChange={setMonth} />
       {/* Summary */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr]">
         <SummaryCard
           title="Current Balance"
           value={formatMoney(balance)}
@@ -203,6 +214,22 @@ export default function Dashboard() {
           daily={summary.data.daily}
           monthly={summary.data.monthly}
         />
+      )}
+      {!loading && !summaryError && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-5">
+          <div>
+            <p className="text-sm text-muted-foreground">Net for this month</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Income minus expenses for your selected month.
+            </p>
+          </div>
+          <p
+            className={`text-2xl font-semibold ${income >= expense ? "text-emerald-500" : "text-red-400"}`}
+          >
+            {income >= expense ? "+" : "−"}
+            {formatMoney(Math.abs(income - expense))}
+          </p>
+        </div>
       )}
       {/* Forms */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -525,7 +552,8 @@ function SummaryCard({
   return (
     <Card
       className={cn(
-        "rounded-2xl",
+        "rounded-2xl shadow-sm",
+        !type && "border-primary/25 bg-primary/8",
         className,
         `${type === "income" && "bg-emerald-500/15"}`,
         `${type === "expense" && "bg-red-500/15"}`,

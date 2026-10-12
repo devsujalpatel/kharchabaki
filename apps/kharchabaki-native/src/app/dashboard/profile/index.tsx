@@ -1,3 +1,4 @@
+import { useAppSession, useOfflineStatus } from "@/lib/session-provider";
 import { type JSX, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,27 +15,13 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut } from "lucide-react-native";
 import { router } from "expo-router";
+
+import { sessionManager } from "@/lib/offline-client";
 import { authClient } from "@/lib/auth-client";
 
 import { PreferencesSettings } from "@/components/PreferencesSettings";
 import { usePreferences } from "@/lib/preferences";
 import { api } from "@/lib/api";
-
-type User = {
-  id: string;
-  name: string;
-  email: string;
-  image?: string | null;
-};
-
-type MeResponse = {
-  success: boolean;
-  data: {
-    session: {
-      user: User;
-    };
-  };
-};
 
 type BalanceResponse = {
   success: boolean;
@@ -43,16 +30,6 @@ type BalanceResponse = {
     balance: number;
   };
 };
-
-async function getMe(): Promise<MeResponse> {
-  const response = await api("/api/v1/me");
-
-  if (!response.ok) {
-    throw new Error("Failed to load profile");
-  }
-
-  return response.json();
-}
 
 async function balanceQuery(): Promise<BalanceResponse> {
   const response = await api("/api/v1/balance");
@@ -86,20 +63,13 @@ async function addBalance(amount: number): Promise<BalanceResponse> {
 
 export default function Profile(): JSX.Element {
   const queryClient = useQueryClient();
+  const offline = useOfflineStatus();
   const { formatMoney, colors } = usePreferences();
 
   const [amount, setAmount] = useState("");
 
-  // User
-  const {
-    data: meData,
-    isPending: isUserLoading,
-    error: userError,
-  } = useQuery({
-    queryKey: ["me"],
-    queryFn: getMe,
-  });
-
+  const { data: session, isPending: isUserLoading } = useAppSession();
+  const meData = session ? { data: { session: { user: session.user } } } : null;
   // Balance
   const {
     data: balanceData,
@@ -134,7 +104,7 @@ export default function Profile(): JSX.Element {
     );
   }
 
-  if (userError || !meData?.data?.session?.user) {
+  if (!meData?.data?.session?.user) {
     return (
       <View className="flex-1 items-center justify-center bg-app-bg px-6">
         <Text className="text-base text-app-text">You are not authenticated.</Text>
@@ -169,7 +139,7 @@ export default function Profile(): JSX.Element {
       <ScrollView
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerClassName="px-5 pb-32 pt-6"
+        contentContainerClassName="px-5 pb-8 pt-6"
       >
         {/* Header */}
 
@@ -248,6 +218,7 @@ export default function Profile(): JSX.Element {
                     onPress: async () => {
                       try {
                         await authClient.signOut();
+                        await sessionManager.expire(null);
                         queryClient.clear();
 
                         router.replace("/");
@@ -269,6 +240,11 @@ export default function Profile(): JSX.Element {
           </View>
         </View>
 
+        {(!offline.online || offline.pending > 0) && (
+          <Text className="mt-5 text-xs text-app-subtle">
+            Connect and finish syncing to change your opening balance.
+          </Text>
+        )}
         {/* Balance */}
 
         <View className="mt-6 rounded-[22px] border border-app-border bg-app-card">
@@ -319,7 +295,13 @@ export default function Profile(): JSX.Element {
               {/* Update */}
 
               <Pressable
-                disabled={isUpdatingBalance || !amount || Number(amount) < 0}
+                disabled={
+                  !offline.online ||
+                  offline.pending > 0 ||
+                  isUpdatingBalance ||
+                  !amount ||
+                  Number(amount) < 0
+                }
                 onPress={handleBalanceSubmit}
                 className={`mt-3 h-11 items-center justify-center rounded-xl ${
                   isUpdatingBalance || !amount || Number(amount) < 0

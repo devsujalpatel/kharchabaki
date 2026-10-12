@@ -3,13 +3,13 @@ import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
 import { api } from "@/lib/api";
-import { authClient } from "@/lib/auth-client";
+import { useAppSession } from "@/components/providers/session-provider";
 import { formatCurrency, type Preferences } from "@/lib/finance";
 
 type Response = { data: Preferences };
 function useAccountPreferences() {
   const client = useQueryClient();
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAppSession();
   const { setTheme } = useTheme();
   const key = ["preferences", session?.user.id];
   const query = useQuery({

@@ -1,3 +1,5 @@
+import { useAppSession } from "@/lib/session-provider";
+import { asObject } from "@/lib/offline-engine";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,6 +24,9 @@ function formatLabel(value: string) {
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
+  const { data: session } = useAppSession();
+  const [entryType, setEntryType] = useState<"income" | "expense">("expense");
+  const [feedback, setFeedback] = useState("");
   const { formatMoney, colors } = usePreferences();
   const [month, setMonth] = useState(currentMonth);
 
@@ -47,7 +52,8 @@ export default function Dashboard() {
   const incomeMutation = useMutation({
     mutationFn: addIncome,
 
-    onSuccess: () => {
+    onSuccess: (result) => {
+      setFeedback(String(asObject(result).message ?? "Saved successfully"));
       setIncomeAmount("");
       setIncomeSource("");
       setIncomeDescription("");
@@ -69,7 +75,8 @@ export default function Dashboard() {
   const expenseMutation = useMutation({
     mutationFn: addExpense,
 
-    onSuccess: () => {
+    onSuccess: (result) => {
+      setFeedback(String(asObject(result).message ?? "Saved successfully"));
       setExpenseAmount("");
       setExpenseCategory("");
       setExpenseDescription("");
@@ -133,13 +140,18 @@ export default function Dashboard() {
   return (
     <ScrollView
       className="flex-1 bg-app-bg"
-      contentContainerClassName="px-4 pt-6 pb-32"
+      contentContainerClassName="px-4 pt-6 pb-8"
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
       <View className="mb-6">
-        <Text className="text-2xl font-semibold text-app-text">Dashboard</Text>
+        <Text className="mb-2 text-xs font-semibold uppercase tracking-widest text-app-primary">
+          Hello, {session?.user.name.split(" ")[0] || "there"}
+        </Text>
+        <Text className="text-3xl font-semibold tracking-tight text-app-text">
+          Your money, in focus.
+        </Text>
 
         <Text className="mt-1 text-sm text-app-subtle">
           Keep track of your money without the noise.
@@ -156,21 +168,27 @@ export default function Dashboard() {
           loading={isSummaryLoading}
         />
 
-        <SummaryCard
-          title="Monthly Income"
-          value={formatMoney(income)}
-          icon={<ArrowUp size={19} color="#34d399" />}
-          type="income"
-          loading={isSummaryLoading}
-        />
+        <View className="flex-row gap-3">
+          <View className="flex-1">
+            <SummaryCard
+              title="Income"
+              value={formatMoney(income)}
+              icon={<ArrowUp size={19} color="#34d399" />}
+              type="income"
+              loading={isSummaryLoading}
+            />
+          </View>
 
-        <SummaryCard
-          title="Monthly Expenses"
-          value={formatMoney(expense)}
-          icon={<ArrowDown size={19} color="#f87171" />}
-          type="expense"
-          loading={isSummaryLoading}
-        />
+          <View className="flex-1">
+            <SummaryCard
+              title="Expenses"
+              value={formatMoney(expense)}
+              icon={<ArrowDown size={19} color="#f87171" />}
+              type="expense"
+              loading={isSummaryLoading}
+            />
+          </View>
+        </View>
       </View>
 
       {isSummaryError && (
@@ -186,201 +204,242 @@ export default function Dashboard() {
           monthly={summary?.data.monthly ?? []}
         />
       )}
-      {/* Add income */}
-      <View className="mt-6 rounded-2xl border border-app-border bg-app-card p-5">
-        <View className="mb-5 flex-row items-center">
-          <View className="mr-3 h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
-            <ArrowUp size={18} color="#34d399" />
-          </View>
-
-          <View>
-            <Text className="text-base font-semibold text-app-text">Add income</Text>
-
-            <Text className="mt-0.5 text-sm text-app-subtle">Record money you received.</Text>
-          </View>
+      {!isSummaryLoading && !isSummaryError && (
+        <View className="my-2 rounded-2xl border border-app-border bg-app-card p-4">
+          <Text className="text-sm text-app-subtle">Net for this month</Text>
+          <Text
+            className={`mt-1 text-xl font-semibold ${income >= expense ? "text-emerald-500" : "text-red-400"}`}
+          >
+            {income >= expense ? "+" : "−"}
+            {formatMoney(Math.abs(income - expense))}
+          </Text>
+          <Text className="mt-1 text-xs text-app-subtle">
+            Income minus expenses for your selected month.
+          </Text>
         </View>
-
-        {/* Amount */}
-        <FieldLabel label="Amount" />
-
-        <TextInput
-          value={incomeAmount}
-          onChangeText={setIncomeAmount}
-          placeholder="5000"
-          placeholderTextColor="#52525b"
-          keyboardType="decimal-pad"
-          editable={!incomeMutation.isPending}
-          className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
-        />
-
-        {/* Source */}
-        <FieldLabel label="Source" />
-
-        <View className="flex-row flex-wrap gap-2">
-          {incomeSources.map((source) => {
-            const selected = incomeSource === source;
-            const Icon = categoryIcon(source);
-
-            return (
-              <Pressable
-                key={source}
-                onPress={() => setIncomeSource(source)}
-                disabled={incomeMutation.isPending}
-                className={`flex-row items-center gap-2 rounded-xl border px-3 py-2.5 ${
-                  selected ? "border-app-primary bg-app-primary" : "border-app-border bg-app-bg"
-                }`}
-              >
-                <Icon size={15} color={selected ? colors.onPrimary : colors.subtle} />
-                <Text
-                  className={`text-sm ${selected ? "font-medium text-app-on-primary" : "text-app-subtle"}`}
-                >
-                  {formatLabel(source)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <DateField
-          value={incomeDate}
-          onChange={setIncomeDate}
-          disabled={incomeMutation.isPending}
-        />
-        {/* Description */}
-        <FieldLabel label="Description" optional />
-
-        <TextInput
-          value={incomeDescription}
-          onChangeText={setIncomeDescription}
-          placeholder="Where did this money come from?"
-          placeholderTextColor="#52525b"
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-          editable={!incomeMutation.isPending}
-          className="min-h-22.5 rounded-xl border border-app-border bg-app-bg px-4 py-3 text-app-text"
-        />
-
-        {/* Submit */}
-        <Pressable
-          onPress={handleAddIncome}
-          disabled={incomeMutation.isPending}
-          className={`mt-5 h-12 flex-row items-center justify-center rounded-xl ${
-            incomeMutation.isPending ? "bg-app-muted" : "bg-app-primary"
-          }`}
-        >
-          {incomeMutation.isPending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Plus size={17} color={colors.onPrimary} />
-              <Text className="ml-2 font-semibold text-app-on-primary">Add income</Text>
-            </>
-          )}
-        </Pressable>
-
-        {incomeMutation.isError && (
-          <Text className="mt-3 text-sm text-red-400">{incomeMutation.error.message}</Text>
-        )}
+      )}
+      <Text className="mt-6 text-lg font-semibold text-app-text">Quick entry</Text>
+      <View className="mt-3 flex-row rounded-2xl bg-app-muted p-1">
+        {(["expense", "income"] as const).map((type) => (
+          <Pressable
+            key={type}
+            onPress={() => setEntryType(type)}
+            className={`flex-1 items-center rounded-xl py-3 ${entryType === type ? "bg-app-primary" : ""}`}
+          >
+            <Text
+              className={
+                entryType === type ? "font-semibold text-app-on-primary" : "text-app-subtle"
+              }
+            >
+              {type === "expense" ? "Add expense" : "Add income"}
+            </Text>
+          </Pressable>
+        ))}
       </View>
+      {feedback && (
+        <Text accessibilityRole="alert" className="mt-3 text-sm text-app-primary">
+          {feedback}
+        </Text>
+      )}
+      {/* Add income */}
+      {entryType === "income" && (
+        <View className="mt-4 rounded-2xl border border-app-border bg-app-card p-5">
+          <View className="mb-5 flex-row items-center">
+            <View className="mr-3 h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
+              <ArrowUp size={18} color="#34d399" />
+            </View>
+
+            <View>
+              <Text className="text-base font-semibold text-app-text">Add income</Text>
+
+              <Text className="mt-0.5 text-sm text-app-subtle">Record money you received.</Text>
+            </View>
+          </View>
+
+          {/* Amount */}
+          <FieldLabel label="Amount" />
+
+          <TextInput
+            value={incomeAmount}
+            onChangeText={setIncomeAmount}
+            placeholder="5000"
+            placeholderTextColor="#52525b"
+            keyboardType="decimal-pad"
+            editable={!incomeMutation.isPending}
+            className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
+          />
+
+          {/* Source */}
+          <FieldLabel label="Source" />
+
+          <View className="flex-row flex-wrap gap-2">
+            {incomeSources.map((source) => {
+              const selected = incomeSource === source;
+              const Icon = categoryIcon(source);
+
+              return (
+                <Pressable
+                  key={source}
+                  onPress={() => setIncomeSource(source)}
+                  disabled={incomeMutation.isPending}
+                  className={`flex-row items-center gap-2 rounded-xl border px-3 py-2.5 ${
+                    selected ? "border-app-primary bg-app-primary" : "border-app-border bg-app-bg"
+                  }`}
+                >
+                  <Icon size={15} color={selected ? colors.onPrimary : colors.subtle} />
+                  <Text
+                    className={`text-sm ${selected ? "font-medium text-app-on-primary" : "text-app-subtle"}`}
+                  >
+                    {formatLabel(source)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <DateField
+            value={incomeDate}
+            onChange={setIncomeDate}
+            disabled={incomeMutation.isPending}
+          />
+          {/* Description */}
+          <FieldLabel label="Description" optional />
+
+          <TextInput
+            value={incomeDescription}
+            onChangeText={setIncomeDescription}
+            placeholder="Where did this money come from?"
+            placeholderTextColor="#52525b"
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+            editable={!incomeMutation.isPending}
+            className="min-h-22.5 rounded-xl border border-app-border bg-app-bg px-4 py-3 text-app-text"
+          />
+
+          {/* Submit */}
+          <Pressable
+            onPress={handleAddIncome}
+            disabled={incomeMutation.isPending}
+            className={`mt-5 h-12 flex-row items-center justify-center rounded-xl ${
+              incomeMutation.isPending ? "bg-app-muted" : "bg-app-primary"
+            }`}
+          >
+            {incomeMutation.isPending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Plus size={17} color={colors.onPrimary} />
+                <Text className="ml-2 font-semibold text-app-on-primary">Add income</Text>
+              </>
+            )}
+          </Pressable>
+
+          {incomeMutation.isError && (
+            <Text className="mt-3 text-sm text-red-400">{incomeMutation.error.message}</Text>
+          )}
+        </View>
+      )}
 
       {/* Add expense */}
-      <View className="mt-4 rounded-2xl border border-app-border bg-app-card p-5">
-        <View className="mb-5 flex-row items-center">
-          <View className="mr-3 h-10 w-10 items-center justify-center rounded-xl bg-red-500/10">
-            <ArrowDown size={18} color="#f87171" />
+      {entryType === "expense" && (
+        <View className="mt-4 rounded-2xl border border-app-border bg-app-card p-5">
+          <View className="mb-5 flex-row items-center">
+            <View className="mr-3 h-10 w-10 items-center justify-center rounded-xl bg-red-500/10">
+              <ArrowDown size={18} color="#f87171" />
+            </View>
+
+            <View>
+              <Text className="text-base font-semibold text-app-text">Add expense</Text>
+
+              <Text className="mt-0.5 text-sm text-app-subtle">Record money you spent.</Text>
+            </View>
           </View>
 
-          <View>
-            <Text className="text-base font-semibold text-app-text">Add expense</Text>
+          {/* Amount */}
+          <FieldLabel label="Amount" />
 
-            <Text className="mt-0.5 text-sm text-app-subtle">Record money you spent.</Text>
-          </View>
-        </View>
+          <TextInput
+            value={expenseAmount}
+            onChangeText={setExpenseAmount}
+            placeholder="500"
+            placeholderTextColor="#52525b"
+            keyboardType="decimal-pad"
+            editable={!expenseMutation.isPending}
+            className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
+          />
 
-        {/* Amount */}
-        <FieldLabel label="Amount" />
+          {/* Category */}
+          <FieldLabel label="Category" />
 
-        <TextInput
-          value={expenseAmount}
-          onChangeText={setExpenseAmount}
-          placeholder="500"
-          placeholderTextColor="#52525b"
-          keyboardType="decimal-pad"
-          editable={!expenseMutation.isPending}
-          className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
-        />
+          <View className="flex-row flex-wrap gap-2">
+            {expenseCategories.map((category) => {
+              const selected = expenseCategory === category;
+              const Icon = categoryIcon(category);
 
-        {/* Category */}
-        <FieldLabel label="Category" />
-
-        <View className="flex-row flex-wrap gap-2">
-          {expenseCategories.map((category) => {
-            const selected = expenseCategory === category;
-            const Icon = categoryIcon(category);
-
-            return (
-              <Pressable
-                key={category}
-                onPress={() => setExpenseCategory(category)}
-                disabled={expenseMutation.isPending}
-                className={`flex-row items-center gap-2 rounded-xl border px-3 py-2.5 ${
-                  selected ? "border-app-primary bg-app-primary" : "border-app-border bg-app-bg"
-                }`}
-              >
-                <Icon size={15} color={selected ? colors.onPrimary : colors.subtle} />
-                <Text
-                  className={`text-sm ${selected ? "font-medium text-app-on-primary" : "text-app-subtle"}`}
+              return (
+                <Pressable
+                  key={category}
+                  onPress={() => setExpenseCategory(category)}
+                  disabled={expenseMutation.isPending}
+                  className={`flex-row items-center gap-2 rounded-xl border px-3 py-2.5 ${
+                    selected ? "border-app-primary bg-app-primary" : "border-app-border bg-app-bg"
+                  }`}
                 >
-                  {formatLabel(category)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+                  <Icon size={15} color={selected ? colors.onPrimary : colors.subtle} />
+                  <Text
+                    className={`text-sm ${selected ? "font-medium text-app-on-primary" : "text-app-subtle"}`}
+                  >
+                    {formatLabel(category)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
-        <DateField
-          value={expenseDate}
-          onChange={setExpenseDate}
-          disabled={expenseMutation.isPending}
-        />
-        {/* Description */}
-        <FieldLabel label="Description" optional />
+          <DateField
+            value={expenseDate}
+            onChange={setExpenseDate}
+            disabled={expenseMutation.isPending}
+          />
+          {/* Description */}
+          <FieldLabel label="Description" optional />
 
-        <TextInput
-          value={expenseDescription}
-          onChangeText={setExpenseDescription}
-          placeholder="What did you spend it on?"
-          placeholderTextColor="#52525b"
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-          editable={!expenseMutation.isPending}
-          className="min-h-22.5 rounded-xl border border-app-border bg-app-bg px-4 py-3 text-app-text"
-        />
+          <TextInput
+            value={expenseDescription}
+            onChangeText={setExpenseDescription}
+            placeholder="What did you spend it on?"
+            placeholderTextColor="#52525b"
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+            editable={!expenseMutation.isPending}
+            className="min-h-22.5 rounded-xl border border-app-border bg-app-bg px-4 py-3 text-app-text"
+          />
 
-        {/* Submit */}
-        <Pressable
-          onPress={handleAddExpense}
-          disabled={expenseMutation.isPending}
-          className={`mt-5 h-12 flex-row items-center justify-center rounded-xl ${
-            expenseMutation.isPending ? "bg-app-muted" : "bg-red-500"
-          }`}
-        >
-          {expenseMutation.isPending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Plus size={17} color="#fff" />
-              <Text className="ml-2 font-semibold text-app-text">Add expense</Text>
-            </>
+          {/* Submit */}
+          <Pressable
+            onPress={handleAddExpense}
+            disabled={expenseMutation.isPending}
+            className={`mt-5 h-12 flex-row items-center justify-center rounded-xl ${
+              expenseMutation.isPending ? "bg-app-muted" : "bg-red-500"
+            }`}
+          >
+            {expenseMutation.isPending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Plus size={17} color="#fff" />
+                <Text className="ml-2 font-semibold text-app-text">Add expense</Text>
+              </>
+            )}
+          </Pressable>
+
+          {expenseMutation.isError && (
+            <Text className="mt-3 text-sm text-red-400">{expenseMutation.error.message}</Text>
           )}
-        </Pressable>
-
-        {expenseMutation.isError && (
-          <Text className="mt-3 text-sm text-red-400">{expenseMutation.error.message}</Text>
-        )}
-      </View>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -409,26 +468,37 @@ function SummaryCard({
   loading: boolean;
 }) {
   const background =
-    type === "income" ? "bg-emerald-500/10" : type === "expense" ? "bg-red-500/10" : "bg-app-card";
+    type === "income"
+      ? "bg-emerald-500/10"
+      : type === "expense"
+        ? "bg-red-500/10"
+        : "bg-app-primary/8";
 
   return (
     <View className={`rounded-2xl border border-app-border p-5 ${background}`}>
-      <View className="flex-row items-center justify-between">
-        <View>
+      <View className={type ? "gap-2" : "flex-row items-center justify-between"}>
+        <View className={type ? "min-w-0" : "min-w-0 flex-1"}>
           <Text className="text-sm text-app-subtle">{title}</Text>
 
           {loading ? (
-            <View className="mt-2 h-7 w-32 rounded-md bg-app-muted" />
+            <View className={`mt-2 h-7 rounded-md bg-app-muted ${type ? "w-20" : "w-32"}`} />
           ) : (
-            <Text className="mt-1 text-2xl font-semibold tracking-tight text-app-text">
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.65}
+              className={`mt-1 font-semibold tracking-tight text-app-text ${type ? "text-xl" : "text-3xl"}`}
+            >
               {value}
             </Text>
           )}
         </View>
 
-        <View className="h-10 w-10 items-center justify-center rounded-xl bg-app-muted">
-          {icon}
-        </View>
+        {!type && (
+          <View className="ml-3 h-10 w-10 items-center justify-center rounded-xl bg-app-muted">
+            {icon}
+          </View>
+        )}
       </View>
     </View>
   );

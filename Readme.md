@@ -108,3 +108,17 @@ Authenticated finance endpoints (under `/api/v1`):
 | `GET`, `PATCH` | `/preferences` | Retrieve or save `currency` and/or `theme`. |
 
 Creation and edit requests accept `amount`, `source` (income) or `category` (expense), optional `description`, and optional `occurredAt` as an ISO UTC timestamp. Editing requires amount and source/category; an omitted date preserves the original date. Amounts must be positive with at most two decimal places. Month boundaries and chart dates use UTC. The balance card always shows the current account balance, including when viewing an older month.
+
+## Offline use
+
+After installing dependencies, rebuild the mobile development app with `pnpm android` or `pnpm ios` in `apps/kharchabaki-native`; AsyncStorage and Expo Crypto need native modules in the build.
+
+Web stores account-scoped finance snapshots and pending changes in IndexedDB; mobile uses AsyncStorage. Income and expense creation, editing, deletion, and preference changes work offline, update local history and charts, and sync in order after reconnection or returning to the app. A sync indicator shows pending changes and server rejections, with retry, correction through the transaction editor, and discard controls. Browser tabs coordinate writes and syncing through Web Locks where available.
+
+Connect once while signed in to save your history, summaries, settings, and loans on a device. Cached complete history supports browsing other months offline. Loan creation/payments and opening-balance replacement require a connection and an empty pending queue. The web service worker caches the visited app shell and assets in production; run `pnpm build` followed by `pnpm start` in `apps/web` to test offline reopening. API responses and session tokens are excluded from the service-worker cache.
+
+A valid saved session permits offline access until its recorded expiry. Confirmed API 401 responses and known session expiry send users to login. An outage preserves valid offline access, and signing in again with the same account restores its unsynced work. Session snapshots store user identity and expiry, without authentication tokens. Native authentication cookies continue to use SecureStore.
+
+Offline transaction creation uses a client UUID. The API recognizes a retry of an existing owned UUID and avoids charging or crediting the balance twice if a response was lost. Deploy the updated API together with the clients.
+
+Run the persistence and session checks from `services/` with `pnpm test:offline`. These exercise offline restarts, local edits/deletion, synchronization, lost responses, storage failures, account isolation, concurrent browser tabs, and session expiry; `pnpm test` covers API balance and retry behavior.

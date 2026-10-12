@@ -1,3 +1,4 @@
+import { useOfflineStatus } from "@/lib/session-provider";
 import { usePreferences } from "@/lib/preferences";
 import { type JSX, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
@@ -30,6 +31,7 @@ export default function Loans(): JSX.Element {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dueDate, setDueDate] = useState(new Date());
   const queryClient = useQueryClient();
+  const offline = useOfflineStatus();
   const { colors } = usePreferences();
 
   const [kind, setKind] = useState<LoanKind>("taken");
@@ -104,8 +106,14 @@ export default function Loans(): JSX.Element {
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerClassName="px-5 pb-32 pt-6"
+        contentContainerClassName="px-5 pb-8 pt-6"
       >
+        {(!offline.online || offline.pending > 0) && (
+          <Text className="mb-4 text-sm text-app-subtle">
+            Your saved loans are available here. Connect and finish syncing to add loans or
+            payments.
+          </Text>
+        )}
         {/* Header */}
 
         <View className="mb-7">
@@ -239,7 +247,7 @@ export default function Loans(): JSX.Element {
           {/* Submit */}
 
           <Pressable
-            disabled={createMutation.isPending}
+            disabled={!offline.online || offline.pending > 0 || createMutation.isPending}
             onPress={submitLoan}
             className={`mt-5 h-12 items-center justify-center rounded-xl ${
               createMutation.isPending ? "bg-app-muted" : "bg-app-primary"
@@ -350,6 +358,7 @@ function LoanRow({
   loan: TakenLoan | GivenLoan;
   onRefresh: () => void;
 }) {
+  const offline = useOfflineStatus();
   const { formatMoney, colors } = usePreferences();
   const [amount, setAmount] = useState("");
 
@@ -460,7 +469,9 @@ function LoanRow({
             />
 
             <Pressable
-              disabled={paymentMutation.isPending || !amount}
+              disabled={
+                !offline.online || offline.pending > 0 || paymentMutation.isPending || !amount
+              }
               onPress={submitPayment}
               className={`ml-2 h-11 w-24 items-center justify-center rounded-xl ${
                 paymentMutation.isPending || !amount ? "bg-app-muted" : "bg-app-primary"

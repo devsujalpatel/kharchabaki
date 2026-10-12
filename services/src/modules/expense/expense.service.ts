@@ -25,6 +25,18 @@ export const createExpense = async (
       throw new Error('User not found');
     }
 
+    if (data.id) {
+      const [existing] = await tx
+        .select()
+        .from(expense)
+        .where(eq(expense.id, data.id))
+        .limit(1);
+      if (existing) {
+        if (existing.userId !== userId)
+          throw new ApiError(409, 'Transaction ID is already in use');
+        return existing;
+      }
+    }
     const currentBalance = Number(currentUser.balance);
 
     if (currentBalance < data.amount) {
@@ -35,6 +47,7 @@ export const createExpense = async (
     const [createdExpense] = await tx
       .insert(expense)
       .values({
+        id: data.id,
         userId,
         amount: data.amount.toFixed(2),
         category: data.category,

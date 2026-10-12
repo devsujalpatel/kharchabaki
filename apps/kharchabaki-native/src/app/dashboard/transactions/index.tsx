@@ -59,7 +59,7 @@ export default function Transactions() {
   return (
     <ScrollView
       className="flex-1 bg-app-bg"
-      contentContainerClassName="px-5 pt-6 pb-32"
+      contentContainerClassName="px-5 pt-6 pb-8"
       keyboardShouldPersistTaps="handled"
     >
       <Text className="text-3xl font-semibold text-app-text">Transactions</Text>
@@ -167,6 +167,11 @@ export default function Transactions() {
                     <Icon size={20} color={isIncome ? "#10b981" : "#f87171"} />
                   </View>
                   <View className="flex-1">
+                    {transaction.pending && (
+                      <Text className="mb-1 text-[10px] text-app-primary">
+                        Saved on this device
+                      </Text>
+                    )}
                     <Text numberOfLines={2} className="font-medium text-app-text">
                       {transaction.description ||
                         formatLabel(transaction.source ?? transaction.category ?? "other")}

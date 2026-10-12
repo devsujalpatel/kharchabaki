@@ -5,10 +5,10 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "KharchaBaki",
     short_name: "KharchaBaki",
     description: "Track your income, expenses and loans",
-    start_url: "/",
+    start_url: "/dashboard",
     display: "standalone",
-    background_color: "#ffffff",
-    theme_color: "#000000",
+    background_color: "#090b09",
+    theme_color: "#090b09",
     orientation: "portrait",
     icons: [
       {

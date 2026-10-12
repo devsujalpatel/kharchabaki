@@ -1,21 +1,32 @@
-'use client'
- 
-import type { ReactNode } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
- 
-let browserQueryClient: QueryClient | undefined
- 
+"use client";
+
+import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+let browserQueryClient: QueryClient | undefined;
+
 function getQueryClient() {
   // Keep server requests isolated and preserve the browser cache across renders.
-  if (typeof window === 'undefined') return new QueryClient()
-  browserQueryClient ??= new QueryClient()
-  return browserQueryClient
+  if (typeof window === "undefined")
+    return new QueryClient({
+      defaultOptions: {
+        queries: { networkMode: "always", staleTime: 30_000, retry: 1 },
+        mutations: { networkMode: "always" },
+      },
+    });
+  browserQueryClient ??= new QueryClient({
+    defaultOptions: {
+      queries: { networkMode: "always", staleTime: 30_000, retry: 1 },
+      mutations: { networkMode: "always" },
+    },
+  });
+  return browserQueryClient;
 }
- 
+
 export function TanstackProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={getQueryClient()}>
       {children}
     </QueryClientProvider>
-  )
+  );
 }

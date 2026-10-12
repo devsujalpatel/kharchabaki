@@ -20,6 +20,10 @@ function query(operation, table, result) {
       call.where = dialect.sqlToQuery(value);
       return this;
     },
+    values(value) {
+      call.values = value;
+      return this;
+    },
     set(value) {
       call.values = value;
       return this;
@@ -50,6 +54,9 @@ const fake = {
   select() {
     return query('select', null, selectResults.shift() ?? []);
   },
+  insert(table) {
+    return query('insert', table, writeResults.shift() ?? []);
+  },
   update(table) {
     return query('update', table, writeResults.shift() ?? []);
   },
@@ -64,6 +71,10 @@ const fake = {
 mock.module(new URL('../dist/database/client.js', import.meta.url).href, {
   namedExports: { db: fake },
 });
+const { createIncome } =
+  await import('../dist/modules/income/income.service.js');
+const { createExpense } =
+  await import('../dist/modules/expense/expense.service.js');
 const { user, expense } = await import('../dist/database/schema.js');
 const { updateTransaction, deleteTransaction, getTransactions } =
   await import('../dist/modules/transactions/transaction.service.js');
@@ -318,3 +329,53 @@ test('financial input validation rejects invalid amounts, categories, and dates'
     );
   }
 });
+
+for (const [type, create] of [
+  ['income', createIncome],
+  ['expense', createExpense],
+]) {
+  test(`${type} retry with the same client UUID never changes balance twice`, async () => {
+    const input = {
+      id,
+      amount: 10,
+      occurredAt: '2026-10-13T00:00:00.000Z',
+      ...(type === 'income' ? { source: 'salary' } : { category: 'food' }),
+    };
+    const existing = { id, userId: owner, amount: '10.00' };
+    selectResults = [
+      [{ id: owner, balance: '100.00' }],
+      [],
+      [{ id: owner, balance: '110.00' }],
+      [existing],
+    ];
+    writeResults = [[existing], []];
+    await create(owner, input);
+    assert.deepEqual(await create(owner, input), existing);
+    assert.equal(calls.filter((call) => call.operation === 'insert').length, 1);
+    assert.equal(calls.filter((call) => call.operation === 'update').length, 1);
+    assert.equal(
+      calls.find((call) => call.operation === 'insert').values.id,
+      id,
+    );
+  });
+  test(`${type} cannot reuse a client UUID owned by another account`, async () => {
+    selectResults = [
+      [{ id: owner, balance: '100.00' }],
+      [{ id, userId: 'account-b', amount: '10.00' }],
+    ];
+    await assert.rejects(
+      create(owner, {
+        id,
+        amount: 10,
+        ...(type === 'income' ? { source: 'salary' } : { category: 'food' }),
+      }),
+      (error) => error.statusCode === 409,
+    );
+    assert.equal(
+      calls.some(
+        (call) => call.operation === 'insert' || call.operation === 'update',
+      ),
+      false,
+    );
+  });
+}

@@ -1,4 +1,5 @@
 "use client";
+import { useOfflineStatus } from "@/components/providers/session-provider";
 import { usePreferences } from "@/components/providers/preferences-provider";
 
 import { SubmitEvent, useState } from "react";
@@ -31,6 +32,7 @@ const initialForm = {
 
 export default function LoansPage() {
   const queryClient = useQueryClient();
+  const offline = useOfflineStatus();
   const [kind, setKind] = useState<LoanKind>("taken");
   const [form, setForm] = useState(initialForm);
 
@@ -82,6 +84,12 @@ export default function LoansPage() {
 
   return (
     <div className="space-y-6">
+      {(!offline.online || offline.pending > 0) && (
+        <p className="text-sm text-muted-foreground">
+          Your saved loans are available here. Connect and finish syncing to add
+          loans or payments.
+        </p>
+      )}
       <div className="sm:mt-10">
         <h1 className="text-2xl font-semibold tracking-tight">Loans</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -171,7 +179,14 @@ export default function LoansPage() {
               />
             </Field>
             <div className="sm:col-span-2 lg:col-span-4">
-              <Button type="submit" disabled={createMutation.isPending}>
+              <Button
+                type="submit"
+                disabled={
+                  !offline.online ||
+                  offline.pending > 0 ||
+                  createMutation.isPending
+                }
+              >
                 {createMutation.isPending && (
                   <Loader2 className="size-4 animate-spin" />
                 )}
@@ -275,6 +290,7 @@ function LoanRow({
   loan: TakenLoan | GivenLoan;
   onRefresh: () => void;
 }) {
+  const offline = useOfflineStatus();
   const { formatMoney } = usePreferences();
   const [amount, setAmount] = useState("");
   const isTaken = kind === "taken";
@@ -341,7 +357,11 @@ function LoanRow({
             <Button
               type="submit"
               size="sm"
-              disabled={paymentMutation.isPending}
+              disabled={
+                !offline.online ||
+                offline.pending > 0 ||
+                paymentMutation.isPending
+              }
             >
               {paymentMutation.isPending ? (
                 <Loader2 className="size-4 animate-spin" />

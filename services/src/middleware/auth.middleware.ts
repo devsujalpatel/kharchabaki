@@ -9,16 +9,18 @@ export const checkAuth = async (
   next: NextFunction,
 ) => {
   try {
-
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(request.headers),
     });
-
 
     if (!session) {
       throw new ApiError(401, 'Unauthorized');
     }
 
+    const expectedAccount = request.get('X-Account-ID');
+    if (expectedAccount && expectedAccount !== session.user.id) {
+      throw new ApiError(401, 'Account changed. Please sign in again.');
+    }
     request.auth = session.user;
     request.session = session.session;
 

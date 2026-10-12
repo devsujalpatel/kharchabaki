@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "kharchabaki-native",
+    "name": "Kharchabaki",
     "slug": "kharchabaki-native",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.kharchabakinative"
@@ -24,9 +24,13 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/app-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#090b09",
+          "imageWidth": 96,
+          "dark": {
+            "backgroundColor": "#090b09"
+          }
         }
       ],
       "expo-status-bar"

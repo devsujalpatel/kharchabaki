@@ -52,7 +52,7 @@ export default function Transactions() {
         : [...new Set([...expenseCategories, ...incomeSources])];
   const transactions = query.data?.data ?? [];
   return (
-    <div className="space-y-6 pb-24 sm:mt-20">
+    <div className="space-y-6 pb-24 ">
       <div>
         <h1 className="text-2xl font-semibold">Transactions</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -165,6 +165,11 @@ export default function Transactions() {
                         transaction.source ?? transaction.category ?? "other",
                       )}
                   </p>
+                  {transaction.pending && (
+                    <span className="mt-1 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] text-primary">
+                      Saved on this device
+                    </span>
+                  )}
                   <p className="mt-1 text-xs text-muted-foreground">
                     {formatLabel(
                       transaction.source ?? transaction.category ?? "other",

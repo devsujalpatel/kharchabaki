@@ -1,6 +1,3 @@
-"use server";
-import { api } from "@/lib/api";
-
 type Data = {
   service: string;
   status: string;
@@ -14,5 +11,7 @@ type Health = {
 };
 
 export async function healthQuery(): Promise<Health> {
-  return api<Health>("/health");
+  const response = await fetch("/api/v1/health", { cache: "no-store" });
+  if (!response.ok) throw new Error("Service is unavailable");
+  return response.json();
 }

@@ -1,5 +1,3 @@
-"use server";
-
 import { api } from "@/lib/api";
 
 export type LoanStatus = "active" | "paid" | "overdue";

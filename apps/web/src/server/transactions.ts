@@ -22,6 +22,7 @@ export type Transaction = {
   source: string | null;
   createdAt: string;
   occurredAt: string;
+  pending?: boolean;
 };
 export type TransactionResponse = {
   success: boolean;

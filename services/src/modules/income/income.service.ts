@@ -14,9 +14,22 @@ export const createIncome = async (userId: string, data: CreateIncomeInput) => {
       .where(eq(user.id, userId))
       .for('update');
     if (!owner) throw new ApiError(404, 'User not found');
+    if (data.id) {
+      const [existing] = await tx
+        .select()
+        .from(income)
+        .where(eq(income.id, data.id))
+        .limit(1);
+      if (existing) {
+        if (existing.userId !== userId)
+          throw new ApiError(409, 'Transaction ID is already in use');
+        return existing;
+      }
+    }
     const [createdIncome] = await tx
       .insert(income)
       .values({
+        id: data.id,
         userId,
         amount: data.amount.toFixed(2),
         updatedAt: new Date(),

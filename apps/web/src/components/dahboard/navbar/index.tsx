@@ -11,6 +11,8 @@ import {
   HandCoins,
 } from "lucide-react";
 
+import { useAppSession } from "@/components/providers/session-provider";
+import { sessionManager } from "@/lib/offline-client";
 import { authClient } from "@/lib/auth-client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -46,7 +48,7 @@ export function Navbar() {
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAppSession();
   const user = session?.user;
 
   const initials =
@@ -59,6 +61,7 @@ export function Navbar() {
 
   const handleSignOut = async () => {
     await authClient.signOut();
+    await sessionManager.expire(null);
     queryClient.clear();
     router.push("/auth/signin");
   };

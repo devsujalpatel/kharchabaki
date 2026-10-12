@@ -1,9 +1,12 @@
 import { AntDesign } from "@expo/vector-icons";
 import { Button } from "heroui-native";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
+import { useAppSession, useOfflineStatus } from "@/lib/session-provider";
+import * as Network from "expo-network";
+import { offlineClient, sessionManager } from "@/lib/offline-client";
 import { authClient } from "@/lib/auth-client";
 
 // Sample cash-flow bars for the preview card (oldest -> newest)
@@ -12,12 +15,16 @@ const MONTHS = ["Oct", "Jan", "Apr", "Jul", "Sep"];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const session = useAppSession();
+  const offline = useOfflineStatus();
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const { data, error } = await authClient.signIn.social({
+      const { error } = await authClient.signIn.social({
         provider: "google",
         // The Expo plugin turns this into a proper deep link for the current
         // environment (dev build, Expo Go, production).
@@ -25,24 +32,24 @@ export default function HomeScreen() {
           scheme: "kharchabaki",
         }),
       });
-      console.log("app callback:", Linking.createURL("/dashboard", { scheme: "kharchabaki" }));
-      console.log(
-        "google redirect_uri:",
-        data?.url ? new URL(data.url).searchParams.get("redirect_uri") : null
-      );
-      if (error) console.error(error);
-
-      // No router.replace here: once the session is stored, the auth guard in
-      // app/_layout.tsx moves the user to /dashboard on its own.
+      if (error) setError(error.message ?? "Could not sign in. Please retry.");
+      else await sessionManager.refresh();
+    } catch {
+      setError("Could not connect to Google. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View
-      className="flex-1 bg-[#010200] px-6"
-      style={{ paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }}
+    <ScrollView
+      className="flex-1 bg-[#090b09]"
+      contentContainerStyle={{
+        flexGrow: 1,
+        paddingHorizontal: 24,
+        paddingTop: insets.top + 16,
+        paddingBottom: insets.bottom + 16,
+      }}
     >
       {/* Brand */}
       <View className="flex-row items-center gap-2.5">
@@ -96,11 +103,43 @@ export default function HomeScreen() {
       </View>
 
       {/* Actions */}
-      <View className="gap-4">
+      <View className="gap-4 mt-8">
+        {session.reason === "expired" && (
+          <Text
+            accessibilityRole="alert"
+            className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200"
+          >
+            Your session expired. Sign in again; unsynced changes are still saved here.
+          </Text>
+        )}
+        {!offline.online && (
+          <Text className="text-center text-sm text-neutral-400">
+            Connect to the internet to sign in.
+          </Text>
+        )}
+        {!offline.online && (
+          <Pressable
+            onPress={() => {
+              void Network.getNetworkStateAsync().then((network) => {
+                offlineClient.setOnline(
+                  network.isConnected !== false && network.isInternetReachable !== false
+                );
+                return sessionManager.refresh(true);
+              });
+            }}
+          >
+            <Text className="text-center text-sm text-[#cbff3d]">Retry connection</Text>
+          </Pressable>
+        )}
+        {error && (
+          <Text accessibilityRole="alert" className="text-sm text-red-400">
+            {error}
+          </Text>
+        )}
         <Button
           size="lg"
           className="bg-[#cbff3d] active:bg-[#cbff3d]/80"
-          isDisabled={loading}
+          isDisabled={loading || !offline.online}
           onPress={handleLogin}
         >
           <AntDesign name="google" size={18} color="#000" />
@@ -116,6 +155,6 @@ export default function HomeScreen() {
           By continuing, you agree to our Terms of Service and Privacy Policy.
         </Text>
       </View>
-    </View>
+    </ScrollView>
   );
 }

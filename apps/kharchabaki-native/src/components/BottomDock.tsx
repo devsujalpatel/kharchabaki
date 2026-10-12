@@ -1,4 +1,5 @@
 import { usePreferences } from "@/lib/preferences";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, Text, View, Image } from "react-native";
 import { usePathname, router } from "expo-router";
 import { LayoutGrid, Receipt, HandCoins, UserRound } from "lucide-react-native";
@@ -31,11 +32,15 @@ const tabs = [
 ];
 
 export function BottomDock({ avatar }: BottomDockProps) {
+  const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const { colors } = usePreferences();
 
   return (
-    <View className="border-t border-app-border bg-app-bg px-2 pb-2 pt-2">
+    <View
+      className="border-t border-app-border bg-app-card px-2 pt-3"
+      style={{ paddingBottom: Math.max(insets.bottom, 10) }}
+    >
       <View className="flex-row">
         {tabs.map((tab) => {
           const isActive =
@@ -54,13 +59,13 @@ export function BottomDock({ avatar }: BottomDockProps) {
             >
               {/* Icon */}
               {tab.label === "Profile" && isActive && avatar ? (
-                <View className="h-9 w-9 items-center justify-center rounded-full border-2 border-white p-0.5">
+                <View className="h-9 w-9 items-center justify-center rounded-full border-2 border-app-primary p-0.5">
                   <Image source={{ uri: avatar }} className="h-full w-full rounded-full" />
                 </View>
               ) : (
                 <View
                   className={`h-9 w-9 items-center justify-center rounded-xl ${
-                    isActive ? "bg-app-muted" : ""
+                    isActive ? "bg-app-primary/10" : ""
                   }`}
                 >
                   <Icon
