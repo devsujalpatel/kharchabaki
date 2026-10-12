@@ -3,27 +3,25 @@ import { desc, eq, sql } from 'drizzle-orm';
 import { db } from '../../database/client.js';
 import { income, user } from '../../database/schema.js';
 
-type CreateIncomeInput = {
-  amount: number;
-  source:
-    | 'salary'
-    | 'pocket-money'
-    | 'gift'
-    | 'invesment'
-    | 'bonues'
-    | 'part-time'
-    | 'other';
-  description?: string;
-};
+import { type IncomeInput as CreateIncomeInput } from '../transactions/transaction.schema.js';
+import { ApiError } from '../../utils/api-error.js';
 
 export const createIncome = async (userId: string, data: CreateIncomeInput) => {
   return db.transaction(async (tx) => {
+    const [owner] = await tx
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.id, userId))
+      .for('update');
+    if (!owner) throw new ApiError(404, 'User not found');
     const [createdIncome] = await tx
       .insert(income)
       .values({
         userId,
         amount: data.amount.toFixed(2),
+        updatedAt: new Date(),
         source: data.source,
+        receivedAt: data.occurredAt ? new Date(data.occurredAt) : new Date(),
         description: data.description?.trim() || null,
       })
       .returning();
@@ -44,7 +42,7 @@ export const createIncome = async (userId: string, data: CreateIncomeInput) => {
 };
 
 export const getIncome = async (userId: string) => {
-  return db
+  const rows = await db
     .select({
       id: income.id,
       amount: income.amount,
@@ -55,6 +53,14 @@ export const getIncome = async (userId: string) => {
     })
     .from(income)
     .where(eq(income.userId, userId))
-    .orderBy(desc(income.createdAt));
+    .orderBy(desc(income.receivedAt));
+  return rows.map((row) => ({
+    ...row,
+    source:
+      row.source === 'invesment'
+        ? 'investment'
+        : row.source === 'bonues'
+          ? 'bonus'
+          : row.source,
+  }));
 };
-

@@ -6,3 +6,38 @@
 /* End-user path: heroui-native lives in the project's node_modules, one
    level up from this src/global.css file. */
 @source '../node_modules/heroui-native/lib';
+
+@theme inline {
+  --color-app-bg: var(--app-bg);
+  --color-app-card: var(--app-card);
+  --color-app-text: var(--app-text);
+  --color-app-muted: var(--app-muted);
+  --color-app-subtle: var(--app-subtle);
+  --color-app-border: var(--app-border);
+  --color-app-primary: var(--app-primary);
+  --color-app-on-primary: var(--app-on-primary);
+}
+@layer theme {
+  :root {
+    @variant light {
+      --app-bg: #f8fafc;
+      --app-card: #ffffff;
+      --app-text: #172033;
+      --app-muted: #e8edf4;
+      --app-subtle: #566479;
+      --app-border: #cbd5e1;
+      --app-primary: #4d7c0f;
+      --app-on-primary: #ffffff;
+    }
+    @variant dark {
+      --app-bg: #090b09;
+      --app-card: #151915;
+      --app-text: #f4f6f0;
+      --app-muted: #232923;
+      --app-subtle: #a1aaa0;
+      --app-border: #364036;
+      --app-primary: #cbff3d;
+      --app-on-primary: #18200a;
+    }
+  }
+}

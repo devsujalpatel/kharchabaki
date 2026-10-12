@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Wallet, Plus, Loader2 } from "lucide-react";
@@ -20,60 +21,42 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import {
+  expenseCategories,
+  incomeSources,
+  currentMonth,
+  categoryIcon,
+} from "@/lib/finance";
+import { usePreferences } from "@/components/providers/preferences-provider";
+import { MonthPicker } from "@/components/month-picker";
+import { MonthlyChart } from "@/components/monthly-chart";
 import { dashboardSummaryQuery } from "@/server/summary";
-
-const expenseCategories = [
-  "food",
-  "travel",
-  "shopping",
-  "bills",
-  "rent",
-  "phone",
-  "beauty",
-  "clothing",
-  "fuel",
-  "gifts",
-  "electronics",
-  "snacks",
-  "vegetables",
-  "fruits",
-  "repairs",
-  "health",
-  "education",
-  "entertainment",
-  "other",
-] as const;
-
-const incomeSources = [
-  "salary",
-  "pocket-money",
-  "gift",
-  "part-time",
-  "investment",
-  "bonus",
-  "other",
-] as const;
 
 type ExpenseForm = {
   amount: number;
   category: (typeof expenseCategories)[number] | "";
   description?: string;
+  date: string;
 };
 
 type IncomeForm = {
   amount: number;
   source: (typeof incomeSources)[number] | "";
   description?: string;
+  date: string;
 };
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
+  const { formatMoney } = usePreferences();
+  const [month, setMonth] = useState(currentMonth);
 
   const incomeForm = useForm<IncomeForm>({
     defaultValues: {
       amount: 0,
       source: "",
       description: "",
+      date: new Date().toISOString().slice(0, 10),
     },
   });
 
@@ -82,6 +65,7 @@ export default function Dashboard() {
       amount: 0,
       category: "",
       description: "",
+      date: new Date().toISOString().slice(0, 10),
     },
   });
 
@@ -91,6 +75,7 @@ export default function Dashboard() {
     onSuccess: () => {
       incomeForm.reset();
 
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({
         queryKey: ["balance"],
       });
@@ -107,6 +92,7 @@ export default function Dashboard() {
     onSuccess: () => {
       expenseForm.reset();
 
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({
         queryKey: ["balance"],
       });
@@ -131,6 +117,7 @@ export default function Dashboard() {
       amount: data.amount,
       source: data.source,
       description: data.description,
+      occurredAt: `${data.date}T00:00:00.000Z`,
     });
   });
 
@@ -148,26 +135,22 @@ export default function Dashboard() {
       amount: data.amount,
       category: data.category,
       description: data.description,
+      occurredAt: `${data.date}T00:00:00.000Z`,
     });
   });
 
-  const { data: summary, isPending: isSummaryLoading } = useQuery({
-    queryKey: ["dashboard-summary"],
-    queryFn: dashboardSummaryQuery,
+  const {
+    data: summary,
+    isPending: isSummaryLoading,
+    error: summaryError,
+  } = useQuery({
+    queryKey: ["dashboard-summary", month],
+    queryFn: () => dashboardSummaryQuery(month),
   });
-
-  console.log(summary);
 
   const balance = Number(summary?.data.balance ?? 0);
   const income = Number(summary?.data.income ?? 0);
   const expense = Number(summary?.data.expense ?? 0);
-
-  const formatMoney = (value: number) =>
-    new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 2,
-    }).format(value);
 
   const loading = isSummaryLoading;
 
@@ -182,6 +165,7 @@ export default function Dashboard() {
         </p>
       </div>
 
+      <MonthPicker month={month} onChange={setMonth} />
       {/* Summary */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryCard
@@ -192,7 +176,7 @@ export default function Dashboard() {
         />
 
         <SummaryCard
-          title="Total Income"
+          title="Monthly Income"
           value={formatMoney(income)}
           icon={ArrowUp}
           loading={loading}
@@ -200,7 +184,7 @@ export default function Dashboard() {
         />
 
         <SummaryCard
-          title="Total Expenses"
+          title="Monthly Expenses"
           value={formatMoney(expense)}
           icon={ArrowDown}
           loading={loading}
@@ -208,6 +192,18 @@ export default function Dashboard() {
         />
       </div>
 
+      {summaryError && (
+        <p role="alert" className="text-destructive">
+          {summaryError.message}
+        </p>
+      )}
+      {summary && (
+        <MonthlyChart
+          key={month}
+          daily={summary.data.daily}
+          monthly={summary.data.monthly}
+        />
+      )}
       {/* Forms */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Income */}
@@ -277,11 +273,17 @@ export default function Dashboard() {
                       </SelectTrigger>
 
                       <SelectContent>
-                        {incomeSources.map((source) => (
-                          <SelectItem key={source} value={source}>
-                            {formatLabel(source)}
-                          </SelectItem>
-                        ))}
+                        {incomeSources.map((source) => {
+                          const Icon = categoryIcon(source);
+                          return (
+                            <SelectItem key={source} value={source}>
+                              <span className="flex items-center gap-2">
+                                <Icon className="size-4" />
+                                {formatLabel(source)}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   )}
@@ -290,6 +292,22 @@ export default function Dashboard() {
                 {incomeForm.formState.errors.source && (
                   <p className="text-sm text-destructive">
                     Please select an income source.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="income-date">Date</Label>
+                <Input
+                  id="income-date"
+                  type="date"
+                  disabled={incomeMutation.isPending}
+                  {...incomeForm.register("date", {
+                    required: "Date is required",
+                  })}
+                />
+                {incomeForm.formState.errors.date && (
+                  <p className="text-sm text-destructive">
+                    {incomeForm.formState.errors.date.message}
                   </p>
                 )}
               </div>
@@ -402,11 +420,17 @@ export default function Dashboard() {
                       </SelectTrigger>
 
                       <SelectContent>
-                        {expenseCategories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {formatLabel(category)}
-                          </SelectItem>
-                        ))}
+                        {expenseCategories.map((category) => {
+                          const Icon = categoryIcon(category);
+                          return (
+                            <SelectItem key={category} value={category}>
+                              <span className="flex items-center gap-2">
+                                <Icon className="size-4" />
+                                {formatLabel(category)}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   )}
@@ -419,6 +443,22 @@ export default function Dashboard() {
                 )}
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="expense-date">Date</Label>
+                <Input
+                  id="expense-date"
+                  type="date"
+                  disabled={expenseMutation.isPending}
+                  {...expenseForm.register("date", {
+                    required: "Date is required",
+                  })}
+                />
+                {expenseForm.formState.errors.date && (
+                  <p className="text-sm text-destructive">
+                    {expenseForm.formState.errors.date.message}
+                  </p>
+                )}
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="description">
                   Description

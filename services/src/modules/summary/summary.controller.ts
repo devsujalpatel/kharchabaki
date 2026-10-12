@@ -1,5 +1,9 @@
 import { Request, Response } from 'express';
 import { ApiResponse } from '../../types/common.types.js';
+import {
+  parseInput,
+  transactionFiltersSchema,
+} from '../transactions/transaction.schema.js';
 import { getDashboardSummary } from './summary.service.js';
 
 export const getDashboardSummaryController = async (
@@ -8,8 +12,10 @@ export const getDashboardSummaryController = async (
 ) => {
   const userId = request.auth!.id;
 
-  const summary = await getDashboardSummary(userId);
-
+  const summary = await getDashboardSummary(
+    userId,
+    parseInput(transactionFiltersSchema, request.query).month,
+  );
 
   const body: ApiResponse<typeof summary> = {
     success: true,

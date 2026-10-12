@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -42,6 +43,7 @@ const navigation = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const router = useRouter();
 
   const { data: session } = authClient.useSession();
@@ -57,6 +59,7 @@ export function Navbar() {
 
   const handleSignOut = async () => {
     await authClient.signOut();
+    queryClient.clear();
     router.push("/auth/signin");
   };
 

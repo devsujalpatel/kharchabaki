@@ -1,402 +1,226 @@
 "use client";
-
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { Pencil, Search, Trash2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowDown,
-  ArrowUp,
-  Search,
-  SlidersHorizontal,
-  Wallet,
-  X,
-} from "lucide-react";
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+  currentMonth,
+  expenseCategories,
+  incomeSources,
+  categoryIcon,
+  formatLabel,
+} from "@/lib/finance";
+import { usePreferences } from "@/components/providers/preferences-provider";
+import {
+  deleteTransaction,
+  transactionsQuery,
+  type Transaction,
+  type TransactionFilters,
+} from "@/server/transactions";
+import { MonthPicker } from "@/components/month-picker";
+import { TransactionEditor } from "@/components/transaction-editor";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { transactionsQuery } from "@/server/transactions";
+import { Input } from "@/components/ui/input";
 
-const expenseCategories = [
-  "food",
-  "travel",
-  "shopping",
-  "bills",
-  "rent",
-  "phone",
-  "beauty",
-  "clothing",
-  "fuel",
-  "gifts",
-  "electronics",
-  "snacks",
-  "vegetables",
-  "fruits",
-  "repairs",
-  "health",
-  "education",
-  "entertainment",
-  "other",
-] as const;
-
-const incomeSources = [
-  "salary",
-  "pocket-money",
-  "gift",
-  "investment",
-  "bonus",
-  "part-time",
-  "other",
-] as const;
-
-type TransactionType = "income" | "expense";
-
-type Transaction = {
-  id: string;
-  type: TransactionType;
-  amount: number;
-  description?: string | null;
-  category?: string | null;
-  source?: string | null;
-  createdAt: string;
-};
-type FilterType = "all" | "income" | "expense";
-
-export default function TransactionsPage() {
-  const [type, setType] = useState<FilterType>("all");
-  const [search, setSearch] = useState("");
+export default function Transactions() {
+  const { formatMoney } = usePreferences();
+  const client = useQueryClient();
+  const [month, setMonth] = useState(currentMonth);
+  const [type, setType] = useState<TransactionFilters["type"]>("all");
   const [category, setCategory] = useState("all");
-
-  const { data, isPending, isError } = useQuery({
-    queryKey: ["transactions", type, category, search],
+  const [search, setSearch] = useState("");
+  const [editing, setEditing] = useState<Transaction | null>(null);
+  const query = useQuery({
+    queryKey: ["transactions", month, type, category, search],
     queryFn: () =>
-      transactionsQuery({
-        type,
-        category,
-        search,
-      }),
+      transactionsQuery({ month: month || undefined, type, category, search }),
   });
-
-  const transactions = data?.data ?? [];
-
-  const filteredTransactions = transactions.filter((transaction) => {
-    if (type !== "all" && transaction.type !== type) {
-      return false;
-    }
-
-    if (
-      category !== "all" &&
-      transaction.category !== category &&
-      transaction.source !== category
-    ) {
-      return false;
-    }
-
-    if (search.trim()) {
-      const query = search.toLowerCase();
-
-      const text = [
-        transaction.description,
-        transaction.category,
-        transaction.source,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      if (!text.includes(query)) {
-        return false;
-      }
-    }
-
-    return true;
+  const deletion = useMutation({
+    mutationFn: deleteTransaction,
+    onSuccess: async () => {
+      await Promise.all(
+        ["transactions", "dashboard-summary", "balance"].map((key) =>
+          client.invalidateQueries({ queryKey: [key] }),
+        ),
+      );
+    },
   });
-
-  const hasFilters =
-    type !== "all" || category !== "all" || search.trim().length > 0;
-
-  const clearFilters = () => {
-    setType("all");
-    setCategory("all");
-    setSearch("");
-  };
-
+  const options =
+    type === "income"
+      ? incomeSources
+      : type === "expense"
+        ? expenseCategories
+        : [...new Set([...expenseCategories, ...incomeSources])];
+  const transactions = query.data?.data ?? [];
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="sm:mt-5">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Transactions
-          </h1>
-
-          <p className="mt-1 text-sm text-muted-foreground">
-            View and manage your income and expenses.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Wallet className="size-4" />
-          <span>{transactions.length} transactions</span>
-        </div>
+    <div className="space-y-6 pb-24 sm:mt-20">
+      <div>
+        <h1 className="text-2xl font-semibold">Transactions</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Browse history and manage your income and expenses.
+        </p>
       </div>
-
-      {/* Filters */}
-      <Card className="rounded-2xl">
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-3 lg:flex-row">
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search transactions..."
-                className="pl-9"
-              />
-            </div>
-
-            {/* Type */}
-            <Select
-              value={type}
-              onValueChange={(value) => {
-                if (
-                  value === "all" ||
-                  value === "income" ||
-                  value === "expense"
-                ) {
-                  setType(value);
-                }
-              }}
-            >
-              <SelectTrigger className="w-full lg:w-40">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="all">All transactions</SelectItem>
-                <SelectItem value="income">Income</SelectItem>
-                <SelectItem value="expense">Expenses</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Category */}
-            <Select
-              value={category}
-              onValueChange={(value) => setCategory(value ?? "all")}
-            >
-              <SelectTrigger className="w-full lg:w-48">
-                <SlidersHorizontal className="mr-2 size-4 text-muted-foreground" />
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="all">All categories</SelectItem>
-
-                {expenseCategories.map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {formatLabel(item)}
-                  </SelectItem>
-                ))}
-
-                {incomeSources.map((item) => (
-                  <SelectItem key={item} value={item}>
-                    {formatLabel(item)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {hasFilters && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={clearFilters}
-                aria-label="Clear filters"
-              >
-                <X className="size-4" />
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Transactions */}
-      <Card className="rounded-2xl mb-20 sm:mb-0">
-        <CardHeader className="border-b">
-          <CardTitle className="text-base">Transaction history</CardTitle>
-        </CardHeader>
-
-        <CardContent className="p-0">
-          {isPending ? (
-            <TransactionSkeleton />
-          ) : isError ? (
-            <div className="flex min-h-48 items-center justify-center px-6">
-              <p className="text-sm text-destructive">
-                Failed to load transactions.
-              </p>
-            </div>
-          ) : filteredTransactions.length === 0 ? (
-            <EmptyState hasFilters={hasFilters} onClear={clearFilters} />
-          ) : (
-            <div className="divide-y">
-              {filteredTransactions.map((transaction) => (
-                <TransactionRow
-                  key={transaction.id}
-                  transaction={transaction}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function TransactionRow({ transaction }: { transaction: Transaction }) {
-  const isIncome = transaction.type === "income";
-
-  const label =
-    transaction.description ||
-    transaction.source ||
-    transaction.category ||
-    "Transaction";
-
-  const secondaryLabel = isIncome ? transaction.source : transaction.category;
-
-  return (
-    <div className="flex items-center justify-between gap-4 px-4 py-4 transition-colors hover:bg-muted/40 sm:px-6">
-      <div className="flex min-w-0 items-center gap-3">
-        {/* Icon */}
-        <div
-          className={[
-            "flex size-10 shrink-0 items-center justify-center rounded-xl",
-            isIncome
-              ? "bg-emerald-500/10 text-emerald-600"
-              : "bg-red-500/10 text-red-600",
-          ].join(" ")}
+      <MonthPicker month={month} onChange={setMonth} allowAll />
+      <div className="flex flex-wrap gap-3 rounded-2xl border bg-card p-4">
+        <div className="relative min-w-48 flex-1">
+          <Search className="absolute left-3 top-3 size-4 text-muted-foreground" />
+          <Input
+            aria-label="Search transactions"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search transactions..."
+            className="pl-9"
+          />
+        </div>
+        <select
+          aria-label="Transaction type"
+          value={type}
+          onChange={(event) => {
+            setType(event.target.value as TransactionFilters["type"]);
+            setCategory("all");
+          }}
+          className="rounded-lg border bg-card px-3 py-2"
         >
-          {isIncome ? (
-            <ArrowUp className="size-4" />
-          ) : (
-            <ArrowDown className="size-4" />
-          )}
-        </div>
-
-        {/* Information */}
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{formatLabel(label)}</p>
-
-          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-            {secondaryLabel && (
-              <>
-                <span>{formatLabel(secondaryLabel)}</span>
-                <span>•</span>
-              </>
-            )}
-
-            <span>{formatDate(transaction.createdAt)}</span>
+          {["all", "income", "expense"].map((option) => (
+            <option value={option} key={option}>
+              {formatLabel(option)}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Transaction category"
+          value={category}
+          onChange={(event) => setCategory(event.target.value)}
+          className="max-w-full rounded-lg border bg-card px-3 py-2"
+        >
+          <option value="all">All categories</option>
+          {options.map((option) => (
+            <option value={option} key={option}>
+              {formatLabel(option)}
+            </option>
+          ))}
+        </select>
+        {(search || category !== "all" || type !== "all") && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setSearch("");
+              setType("all");
+              setCategory("all");
+            }}
+          >
+            Clear filters
+          </Button>
+        )}
+      </div>
+      <section className="rounded-2xl border bg-card p-5">
+        <h2 className="mb-4 font-semibold">
+          Transaction history · {transactions.length}
+        </h2>
+        {deletion.error && (
+          <p role="alert" className="mb-4 text-destructive">
+            {deletion.error.message}
+          </p>
+        )}
+        {query.isPending ? (
+          <p className="py-10 text-center text-muted-foreground">
+            Loading transactions...
+          </p>
+        ) : query.error ? (
+          <div>
+            <p role="alert" className="text-destructive">
+              {query.error.message}
+            </p>
+            <Button
+              className="mt-3"
+              variant="outline"
+              onClick={() => query.refetch()}
+            >
+              Retry
+            </Button>
           </div>
-        </div>
-      </div>
-
-      {/* Amount */}
-      <div
-        className={[
-          "shrink-0 text-sm font-semibold",
-          isIncome ? "text-emerald-600" : "text-red-600",
-        ].join(" ")}
-      >
-        {isIncome ? "+" : "-"}
-        {formatMoney(transaction.amount)}
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({
-  hasFilters,
-  onClear,
-}: {
-  hasFilters: boolean;
-  onClear: () => void;
-}) {
-  return (
-    <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
-      <div className="flex size-12 items-center justify-center rounded-2xl bg-muted">
-        <Wallet className="size-5 text-muted-foreground" />
-      </div>
-
-      <h3 className="mt-4 text-sm font-medium">
-        {hasFilters ? "No matching transactions" : "No transactions yet"}
-      </h3>
-
-      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-        {hasFilters
-          ? "Try changing your search or filters."
-          : "Your income and expenses will appear here once you add them."}
-      </p>
-
-      {hasFilters && (
-        <Button variant="outline" size="sm" className="mt-4" onClick={onClear}>
-          Clear filters
-        </Button>
+        ) : !transactions.length ? (
+          <p className="py-10 text-center text-muted-foreground">
+            No transactions for this month or filter.
+          </p>
+        ) : (
+          transactions.map((transaction) => {
+            const Icon = categoryIcon(
+              transaction.source ?? transaction.category,
+            );
+            const isIncome = transaction.type === "income";
+            return (
+              <div
+                key={`${transaction.type}-${transaction.id}`}
+                className="flex flex-wrap items-center gap-3 border-t py-4"
+              >
+                <div
+                  className={`rounded-xl bg-muted p-3 ${isIncome ? "text-emerald-500" : "text-red-400"}`}
+                >
+                  <Icon className="size-5" />
+                </div>
+                <div className="min-w-32 flex-1">
+                  <p className="break-words font-medium">
+                    {transaction.description ||
+                      formatLabel(
+                        transaction.source ?? transaction.category ?? "other",
+                      )}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatLabel(
+                      transaction.source ?? transaction.category ?? "other",
+                    )}{" "}
+                    ·{" "}
+                    {new Date(transaction.occurredAt).toLocaleDateString("en", {
+                      timeZone: "UTC",
+                    })}
+                  </p>
+                </div>
+                <p
+                  className={`font-semibold ${isIncome ? "text-emerald-500" : "text-red-400"}`}
+                >
+                  {isIncome ? "+" : "−"}
+                  {formatMoney(transaction.amount)}
+                </p>
+                <div className="ml-auto flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Edit ${transaction.type}`}
+                    disabled={deletion.isPending}
+                    onClick={() => setEditing(transaction)}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive"
+                    aria-label={`Delete ${transaction.type}`}
+                    disabled={deletion.isPending}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Delete this ${transaction.type} of ${formatMoney(transaction.amount)}? Your balance will be updated.`,
+                        )
+                      )
+                        deletion.mutate(transaction);
+                    }}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </section>
+      {editing && (
+        <TransactionEditor
+          key={`${editing.type}-${editing.id}`}
+          transaction={editing}
+          onClose={() => setEditing(null)}
+        />
       )}
     </div>
   );
-}
-
-function TransactionSkeleton() {
-  return (
-    <div className="divide-y">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div
-          key={index}
-          className="flex items-center justify-between px-4 py-4 sm:px-6"
-        >
-          <div className="flex items-center gap-3">
-            <div className="size-10 animate-pulse rounded-xl bg-muted" />
-
-            <div className="space-y-2">
-              <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-              <div className="h-3 w-24 animate-pulse rounded bg-muted" />
-            </div>
-          </div>
-
-          <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value));
-}
-
-function formatLabel(value: string) {
-  return value
-    .replace(/-/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
 }

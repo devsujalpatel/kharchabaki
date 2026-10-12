@@ -1,4 +1,5 @@
 "use client";
+import { usePreferences } from "@/components/providers/preferences-provider";
 
 import { SubmitEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -274,6 +275,7 @@ function LoanRow({
   loan: TakenLoan | GivenLoan;
   onRefresh: () => void;
 }) {
+  const { formatMoney } = usePreferences();
   const [amount, setAmount] = useState("");
   const isTaken = kind === "taken";
   const person = "borrowedFrom" in loan ? loan.borrowedFrom : loan.borrowerName;
@@ -374,14 +376,6 @@ function Field({
       {children}
     </div>
   );
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(value);
 }
 
 function formatDate(value: string) {

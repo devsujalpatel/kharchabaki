@@ -24,7 +24,8 @@ export async function api<T>(
   });
 
   if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.message ?? `API Error: ${response.status}`);
   }
 
   return response.json();

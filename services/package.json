@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsc && node --experimental-test-module-mocks --test --test-isolation=none tests/*.test.mjs"
   },
   "keywords": [],
   "author": "Sujal Patel",

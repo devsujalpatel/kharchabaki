@@ -41,7 +41,6 @@ export const auth = betterAuth({
         attributes: {
           sameSite: 'none',
           secure: true,
-          httpOnly: true,
         },
       },
     },

@@ -57,6 +57,13 @@
       "when": 1789729890041,
       "tag": "0007_mysterious_scream",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791834561489,
+      "tag": "0008_monthly_history_preferences",
+      "breakpoints": true
     }
   ]
 }

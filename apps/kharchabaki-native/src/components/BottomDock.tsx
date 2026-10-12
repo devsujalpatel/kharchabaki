@@ -1,3 +1,4 @@
+import { usePreferences } from "@/lib/preferences";
 import { Pressable, Text, View, Image } from "react-native";
 import { usePathname, router } from "expo-router";
 import { LayoutGrid, Receipt, HandCoins, UserRound } from "lucide-react-native";
@@ -31,12 +32,14 @@ const tabs = [
 
 export function BottomDock({ avatar }: BottomDockProps) {
   const pathname = usePathname();
+  const { colors } = usePreferences();
 
   return (
-    <View className="border-t border-zinc-900 bg-black px-2 pb-2 pt-2">
+    <View className="border-t border-app-border bg-app-bg px-2 pb-2 pt-2">
       <View className="flex-row">
         {tabs.map((tab) => {
-          const isActive = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
+          const isActive =
+            tab.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(tab.href);
 
           const Icon = tab.icon;
 
@@ -57,13 +60,13 @@ export function BottomDock({ avatar }: BottomDockProps) {
               ) : (
                 <View
                   className={`h-9 w-9 items-center justify-center rounded-xl ${
-                    isActive ? "bg-zinc-900" : ""
+                    isActive ? "bg-app-muted" : ""
                   }`}
                 >
                   <Icon
                     size={22}
                     strokeWidth={isActive ? 2.5 : 1.8}
-                    color={isActive ? "#ffffff" : "#8b8b83"}
+                    color={isActive ? colors.primary : colors.subtle}
                   />
                 </View>
               )}
@@ -71,7 +74,7 @@ export function BottomDock({ avatar }: BottomDockProps) {
               {/* Label */}
               <Text
                 className={`mt-1 text-[12px] ${
-                  isActive ? "font-medium text-white" : "text-zinc-500"
+                  isActive ? "font-medium text-app-text" : "text-app-subtle"
                 }`}
               >
                 {tab.label}

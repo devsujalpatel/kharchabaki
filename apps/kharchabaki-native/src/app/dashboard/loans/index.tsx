@@ -1,3 +1,4 @@
+import { usePreferences } from "@/lib/preferences";
 import { type JSX, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { ArrowDownLeft, ArrowUpRight, HandCoins } from "lucide-react-native";
@@ -29,6 +30,7 @@ export default function Loans(): JSX.Element {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dueDate, setDueDate] = useState(new Date());
   const queryClient = useQueryClient();
+  const { colors } = usePreferences();
 
   const [kind, setKind] = useState<LoanKind>("taken");
   const [form, setForm] = useState(initialForm);
@@ -98,7 +100,7 @@ export default function Loans(): JSX.Element {
   };
 
   return (
-    <View className="flex-1 bg-black">
+    <View className="flex-1 bg-app-bg">
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -107,28 +109,28 @@ export default function Loans(): JSX.Element {
         {/* Header */}
 
         <View className="mb-7">
-          <Text className="text-3xl font-semibold tracking-tight text-white">Loans</Text>
+          <Text className="text-3xl font-semibold tracking-tight text-app-text">Loans</Text>
 
-          <Text className="mt-1 text-sm text-zinc-500">
+          <Text className="mt-1 text-sm text-app-subtle">
             Track money you borrow and lend, including repayments.
           </Text>
         </View>
 
         {/* Add Loan */}
 
-        <View className="rounded-[22px] border border-zinc-900 bg-[#050604] p-5">
-          <Text className="text-lg font-medium text-white">Add a loan</Text>
+        <View className="rounded-[22px] border border-app-border bg-app-card p-5">
+          <Text className="text-lg font-medium text-app-text">Add a loan</Text>
 
           {/* Loan type */}
 
-          <View className="mt-5 flex-row rounded-xl bg-zinc-900 p-1">
+          <View className="mt-5 flex-row rounded-xl bg-app-muted p-1">
             <Pressable
               onPress={() => setKind("taken")}
               className={`flex-1 items-center rounded-lg py-3 ${
-                kind === "taken" ? "bg-zinc-700" : ""
+                kind === "taken" ? "bg-app-muted" : ""
               }`}
             >
-              <Text className={kind === "taken" ? "font-medium text-white" : "text-zinc-500"}>
+              <Text className={kind === "taken" ? "font-medium text-app-text" : "text-app-subtle"}>
                 I borrowed
               </Text>
             </Pressable>
@@ -136,10 +138,10 @@ export default function Loans(): JSX.Element {
             <Pressable
               onPress={() => setKind("given")}
               className={`flex-1 items-center rounded-lg py-3 ${
-                kind === "given" ? "bg-zinc-700" : ""
+                kind === "given" ? "bg-app-muted" : ""
               }`}
             >
-              <Text className={kind === "given" ? "font-medium text-white" : "text-zinc-500"}>
+              <Text className={kind === "given" ? "font-medium text-app-text" : "text-app-subtle"}>
                 I lent
               </Text>
             </Pressable>
@@ -159,7 +161,7 @@ export default function Loans(): JSX.Element {
               keyboardType="decimal-pad"
               placeholder="5000"
               placeholderTextColor="#52525b"
-              className="h-12 rounded-xl border border-zinc-800 bg-[#0b0d09] px-4 text-white"
+              className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
             />
           </LoanField>
 
@@ -177,7 +179,7 @@ export default function Loans(): JSX.Element {
               placeholder={kind === "taken" ? "Bank or person" : "Person's name"}
               placeholderTextColor="#52525b"
               maxLength={100}
-              className="h-12 rounded-xl border border-zinc-800 bg-[#0b0d09] px-4 text-white"
+              className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
             />
           </LoanField>
 
@@ -186,11 +188,11 @@ export default function Loans(): JSX.Element {
           <LoanField label="Due date">
             <Pressable
               onPress={() => setShowDatePicker(true)}
-              className="h-12 flex-row items-center justify-between rounded-xl border border-zinc-800 bg-[#0b0d09] px-4"
+              className="h-12 flex-row items-center justify-between rounded-xl border border-app-border bg-app-bg px-4"
             >
-              <Text className="text-white">{formatDateForInput(dueDate)}</Text>
+              <Text className="text-app-text">{formatDateForInput(dueDate)}</Text>
 
-              <Text className="text-zinc-500">Select</Text>
+              <Text className="text-app-subtle">Select</Text>
             </Pressable>
 
             {showDatePicker && (
@@ -230,7 +232,7 @@ export default function Loans(): JSX.Element {
               keyboardType="decimal-pad"
               placeholder="0.00"
               placeholderTextColor="#52525b"
-              className="h-12 rounded-xl border border-zinc-800 bg-[#0b0d09] px-4 text-white"
+              className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
             />
           </LoanField>
 
@@ -240,13 +242,13 @@ export default function Loans(): JSX.Element {
             disabled={createMutation.isPending}
             onPress={submitLoan}
             className={`mt-5 h-12 items-center justify-center rounded-xl ${
-              createMutation.isPending ? "bg-lime-900" : "bg-lime-500"
+              createMutation.isPending ? "bg-app-muted" : "bg-app-primary"
             }`}
           >
             {createMutation.isPending ? (
-              <ActivityIndicator color="#000" />
+              <ActivityIndicator color={colors.onPrimary} />
             ) : (
-              <Text className="font-semibold text-black">
+              <Text className="font-semibold text-app-on-primary">
                 Add {kind === "taken" ? "borrowed" : "given"} loan
               </Text>
             )}
@@ -263,14 +265,14 @@ export default function Loans(): JSX.Element {
 
         <View className="mt-6">
           {hasError ? (
-            <View className="rounded-[22px] border border-zinc-900 bg-[#050604] px-5 py-12">
+            <View className="rounded-[22px] border border-app-border bg-app-card px-5 py-12">
               <Text className="text-center text-sm text-red-400">Failed to load loans.</Text>
             </View>
           ) : isLoading ? (
-            <View className="rounded-[22px] border border-zinc-900 bg-[#050604] py-12">
+            <View className="rounded-[22px] border border-app-border bg-app-card py-12">
               <ActivityIndicator color="#ffffff" />
 
-              <Text className="mt-3 text-center text-sm text-zinc-500">Loading loans...</Text>
+              <Text className="mt-3 text-center text-sm text-app-subtle">Loading loans...</Text>
             </View>
           ) : (
             <>
@@ -297,10 +299,10 @@ function LoanList({
   const isTaken = kind === "taken";
 
   return (
-    <View className="mb-5 overflow-hidden rounded-[22px] border border-zinc-900 bg-[#050604]">
+    <View className="mb-5 overflow-hidden rounded-[22px] border border-app-border bg-app-card">
       {/* Header */}
 
-      <View className="flex-row items-center border-b border-zinc-900 p-5">
+      <View className="flex-row items-center border-b border-app-border p-5">
         <View
           className={`h-10 w-10 items-center justify-center rounded-xl ${
             isTaken ? "bg-amber-500/10" : "bg-emerald-500/10"
@@ -313,7 +315,7 @@ function LoanList({
           )}
         </View>
 
-        <Text className="ml-3 text-base font-medium text-white">
+        <Text className="ml-3 text-base font-medium text-app-text">
           {isTaken ? "Money borrowed" : "Money lent"}
         </Text>
       </View>
@@ -324,7 +326,7 @@ function LoanList({
         <View className="items-center justify-center px-6 py-12">
           <HandCoins size={22} color="#52525b" />
 
-          <Text className="mt-3 text-sm text-zinc-500">
+          <Text className="mt-3 text-sm text-app-subtle">
             No {isTaken ? "borrowed" : "given"} loans yet.
           </Text>
         </View>
@@ -348,6 +350,7 @@ function LoanRow({
   loan: TakenLoan | GivenLoan;
   onRefresh: () => void;
 }) {
+  const { formatMoney, colors } = usePreferences();
   const [amount, setAmount] = useState("");
 
   const isTaken = kind === "taken";
@@ -389,16 +392,16 @@ function LoanRow({
   };
 
   return (
-    <View className="border-b border-zinc-900 p-5">
+    <View className="border-b border-app-border p-5">
       {/* Top */}
 
       <View className="flex-row items-start justify-between">
         <View className="flex-1 pr-3">
-          <Text numberOfLines={1} className="text-base font-medium text-white">
+          <Text numberOfLines={1} className="text-base font-medium text-app-text">
             {person}
           </Text>
 
-          <Text className="mt-1 text-xs text-zinc-500">
+          <Text className="mt-1 text-xs text-app-subtle">
             Due {formatDate(loan.dueDate)} · {loan.interest}% interest
           </Text>
         </View>
@@ -431,11 +434,11 @@ function LoanRow({
       {/* Amount */}
 
       <View className="mt-5">
-        <Text className="text-xs text-zinc-500">Outstanding</Text>
+        <Text className="text-xs text-app-subtle">Outstanding</Text>
 
-        <Text className="mt-1 text-xl font-semibold text-white">{formatMoney(outstanding)}</Text>
+        <Text className="mt-1 text-xl font-semibold text-app-text">{formatMoney(outstanding)}</Text>
 
-        <Text className="mt-1 text-xs text-zinc-600">
+        <Text className="mt-1 text-xs text-app-subtle">
           of {formatMoney(Number(loan.totalAmount))}
         </Text>
       </View>
@@ -444,7 +447,7 @@ function LoanRow({
 
       {loan.status !== "paid" && (
         <View className="mt-5">
-          <Text className="mb-2 text-xs font-medium text-zinc-400">Record payment</Text>
+          <Text className="mb-2 text-xs font-medium text-app-subtle">Record payment</Text>
 
           <View className="flex-row">
             <TextInput
@@ -453,20 +456,20 @@ function LoanRow({
               keyboardType="decimal-pad"
               placeholder="Payment amount"
               placeholderTextColor="#52525b"
-              className="h-11 flex-1 rounded-xl border border-zinc-800 bg-[#0b0d09] px-3 text-white"
+              className="h-11 flex-1 rounded-xl border border-app-border bg-app-bg px-3 text-app-text"
             />
 
             <Pressable
               disabled={paymentMutation.isPending || !amount}
               onPress={submitPayment}
               className={`ml-2 h-11 w-24 items-center justify-center rounded-xl ${
-                paymentMutation.isPending || !amount ? "bg-zinc-800" : "bg-lime-500"
+                paymentMutation.isPending || !amount ? "bg-app-muted" : "bg-app-primary"
               }`}
             >
               {paymentMutation.isPending ? (
-                <ActivityIndicator color="#000" />
+                <ActivityIndicator color={colors.onPrimary} />
               ) : (
-                <Text className="text-sm font-semibold text-black">Record</Text>
+                <Text className="text-sm font-semibold text-app-on-primary">Record</Text>
               )}
             </Pressable>
           </View>
@@ -483,19 +486,11 @@ function LoanRow({
 function LoanField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View className="mt-4">
-      <Text className="mb-2 text-sm font-medium text-white">{label}</Text>
+      <Text className="mb-2 text-sm font-medium text-app-text">{label}</Text>
 
       {children}
     </View>
   );
-}
-
-function formatMoney(value: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(value);
 }
 
 function formatDate(value: string) {

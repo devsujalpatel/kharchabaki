@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 import { addBalance, balanceQuery } from "@/server/balance";
 
+import { PreferencesSettings } from "@/components/preferences-settings";
+import { usePreferences } from "@/components/providers/preferences-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +21,7 @@ import { Separator } from "@/components/ui/separator";
 
 export default function ProfileDashboard() {
   const queryClient = useQueryClient();
+  const { formatMoney } = usePreferences();
 
   const { data: session, isPending: isSessionLoading } =
     authClient.useSession();
@@ -40,6 +43,7 @@ export default function ProfileDashboard() {
     onSuccess: () => {
       setAmount("");
 
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
       queryClient.invalidateQueries({
         queryKey: ["balance"],
       });
@@ -63,14 +67,13 @@ export default function ProfileDashboard() {
   }
 
   const user = session.user;
-  console.log(user.image);
 
   const handleBalanceSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const value = Number(amount);
 
-    if (!value || value < 0) {
+    if (!amount.trim() || !Number.isFinite(value) || value < 0) {
       return;
     }
 
@@ -157,7 +160,7 @@ export default function ProfileDashboard() {
                 </p>
               ) : (
                 <p className="mt-1 text-3xl font-semibold tracking-tight">
-                  ₹{balanceData?.data.balance.toLocaleString("en-IN")}
+                  {formatMoney(balanceData?.data.balance ?? 0)}
                 </p>
               )}
             </div>
@@ -198,6 +201,7 @@ export default function ProfileDashboard() {
           </CardContent>
         </Card>
       </div>
+      <PreferencesSettings />
     </main>
   );
 }

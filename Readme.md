@@ -2,15 +2,15 @@
 
 Kharchabaki is a personal finance app for keeping everyday money matters in one place: income, expenses, balances, and money lent or borrowed.
 
-This repository is in its early stages. It currently contains the TypeScript/Express API foundation; the web and mobile clients are reserved for future work.
+The repository contains an Express API, a Next.js web app, and an Expo mobile app.
 
 ## Project structure
 
 ```text
 kharchabaki/
 ├── apps/
-│   ├── mobile/       # Future mobile client
-│   └── web/          # Future web client
+│   ├── kharchabaki-native/ # Expo mobile app
+│   └── web/                # Next.js web app
 └── services/         # Express API
 ```
 
@@ -78,10 +78,33 @@ Run these inside `services/`:
 | --- | --- |
 | `pnpm dev` | Start the API in watch mode. |
 | `pnpm typecheck` | Check TypeScript without emitting files. |
+| `pnpm test` | Build and run finance service tests with a mocked database transport. |
 | `pnpm db:generate` | Generate Drizzle migration files. |
 | `pnpm db:migrate` | Apply Drizzle migrations. |
 | `pnpm db:push` | Push the schema to the configured database. |
 
-## Status
+## Finance features
 
-The API currently provides its base middleware, versioned routing, health check, error handling, and graceful shutdown. Finance features and client applications are still to come.
+Both clients provide a six-month income/expense comparison, daily chart detail, month-by-month transaction history, and income/expense editing and deletion. Forms accept transaction dates for entering older records. History supports month, type, category, and search filters, with an all-history option.
+
+Profile settings save the account's default currency and theme. Currency choices include INR (₹), USD ($), GBP (£), JPY (¥), EUR (€), and other supported currencies. Changing the currency changes formatting without converting stored amounts. Themes are Light, Dark, Ocean, Forest, Sunset, and Rose.
+
+Before running the updated clients, apply the schema migration from `services/`:
+
+```bash
+pnpm db:migrate
+```
+
+The migration adds categories and account preferences while preserving existing transactions and legacy income source values.
+
+Authenticated finance endpoints (under `/api/v1`):
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/summary?month=2026-10` | Current balance, selected-month totals, daily points, and six monthly buckets ending in the selected month. |
+| `GET` | `/transactions?month=2026-10&type=expense&category=food&search=lunch` | Filtered history. Omit `month` to retrieve all history. |
+| `GET`, `POST` | `/income`, `/expense` | List or create income/expenses. |
+| `PATCH`, `DELETE` | `/income/:id`, `/expense/:id` | Edit or delete an owned transaction and adjust its balance contribution atomically. |
+| `GET`, `PATCH` | `/preferences` | Retrieve or save `currency` and/or `theme`. |
+
+Creation and edit requests accept `amount`, `source` (income) or `category` (expense), optional `description`, and optional `occurredAt` as an ISO UTC timestamp. Editing requires amount and source/category; an omitted date preserves the original date. Amounts must be positive with at most two decimal places. Month boundaries and chart dates use UTC. The balance card always shows the current account balance, including when viewing an older month.

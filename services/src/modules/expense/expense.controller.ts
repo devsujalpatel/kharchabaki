@@ -1,57 +1,66 @@
 import { Request, Response } from 'express';
-
 import { createExpense, getExpense } from './expense.service.js';
-import { ApiResponse } from '../../types/common.types.js';
-import { ApiError } from '../../utils/api-error.js';
+import {
+  updateTransaction,
+  deleteTransaction,
+} from '../transactions/transaction.service.js';
+import {
+  expenseInputSchema,
+  parseInput,
+  parseId,
+} from '../transactions/transaction.schema.js';
 
 export const createExpenseController = async (
   request: Request,
   response: Response,
 ) => {
-  const userId = request.auth!.id;
-
-  const { amount, category, description } = request.body;
-
-  if (typeof amount !== 'number' || !Number.isFinite(amount)) {
-    throw new ApiError(400, 'Amount must be a valid number');
-  }
-
-  if (amount <= 0) {
-    throw new ApiError(400, 'Amount must be greater than 0');
-  }
-
-  if (!category) {
-    throw new ApiError(400, 'Expense category is required');
-  }
-
-  const expense = await createExpense(userId, {
-    amount,
-    category,
-    description,
-  });
-
-  const body: ApiResponse<typeof expense> = {
-    success: true,
-    message: 'Expense added successfully',
-    data: expense,
-  };
-
-  response.status(201).json(body);
+  const data = await createExpense(
+    request.auth!.id,
+    parseInput(expenseInputSchema, request.body),
+  );
+  response
+    .status(201)
+    .json({ success: true, message: 'Expense added successfully', data });
 };
-
 export const getExpenseController = async (
   request: Request,
   response: Response,
 ) => {
-  const userId = request.auth!.id;
-
-  const expenses = await getExpense(userId);
-
-  const body: ApiResponse<typeof expenses> = {
+  const data = await getExpense(request.auth!.id);
+  response.json({
     success: true,
-    message: 'Expenses fetched successfully',
-    data: expenses,
-  };
-
-  response.status(200).json(body);
+    message: 'Expense fetched successfully',
+    data,
+  });
+};
+export const updateExpenseController = async (
+  request: Request,
+  response: Response,
+) => {
+  const data = await updateTransaction(
+    request.auth!.id,
+    parseId(request.params.id),
+    'expense',
+    parseInput(expenseInputSchema, request.body),
+  );
+  response.json({
+    success: true,
+    message: 'Expense updated successfully',
+    data,
+  });
+};
+export const deleteExpenseController = async (
+  request: Request,
+  response: Response,
+) => {
+  const data = await deleteTransaction(
+    request.auth!.id,
+    parseId(request.params.id),
+    'expense',
+  );
+  response.json({
+    success: true,
+    message: 'Expense deleted successfully',
+    data,
+  });
 };

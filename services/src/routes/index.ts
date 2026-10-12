@@ -14,6 +14,8 @@ import { expenseRouter } from '../modules/expense/expense.route.js';
 import { summaryRouter } from '../modules/summary/summary.route.js';
 import { loanRouter } from '../modules/loan/loan.route.js';
 
+import { preferencesRouter } from '../modules/preferences/preferences.route.js';
+
 export const apiRouter = Router();
 
 //health
@@ -34,7 +36,6 @@ apiRouter.get('/health', (_request, response) => {
   response.status(200).json(body);
 });
 
-
 apiRouter.use(authRouter);
 
 // protected routes
@@ -44,3 +45,5 @@ apiRouter.use(checkAuth, incomeRouter);
 apiRouter.use(checkAuth, expenseRouter);
 apiRouter.use(checkAuth, summaryRouter);
 apiRouter.use(checkAuth, loanRouter);
+
+apiRouter.use(checkAuth, preferencesRouter);

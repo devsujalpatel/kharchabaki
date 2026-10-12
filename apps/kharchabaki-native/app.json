@@ -7,12 +7,13 @@
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.kharchabakinative"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/app-icon.png",
+        "backgroundColor": "#071A12"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.kharchabakinative"

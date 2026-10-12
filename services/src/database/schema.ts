@@ -16,6 +16,8 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
+  currency: text('currency').default('INR').notNull(),
+  theme: text('theme').default('dark').notNull(),
   balance: decimal('balance', { precision: 19, scale: 2 })
     .default('0.00')
     .notNull(),
@@ -104,12 +106,22 @@ export const expenseCategoryEnum = pgEnum('expense_category', [
   'gifts',
   'electronics',
   'snacks',
+  'drinks',
   'vegetables',
   'fruits',
   'repairs',
   'health',
   'education',
   'entertainment',
+  'groceries',
+  'transport',
+  'insurance',
+  'subscriptions',
+  'fitness',
+  'pets',
+  'childcare',
+  'donations',
+  'taxes',
   'other',
 ]);
 
@@ -121,6 +133,16 @@ export const incomeSourceEnum = pgEnum('income_source', [
   'invesment',
   'bonues',
   'part-time',
+  'investment',
+  'bonus',
+  'freelance',
+  'business',
+  'rental',
+  'interest',
+  'dividends',
+  'refund',
+  'pension',
+  'sale',
   'other',
 ]);
 
@@ -313,6 +335,20 @@ export const givenLoanPayment = pgTable(
   },
   (table) => [index('given_loan_payment_loan_id_idx').on(table.loanId)],
 );
+
+// export const passwordTable = pgTable('account_password', {
+//   id: uuid('id').defaultRandom().primaryKey(),
+//   userId: text('user_id')
+//     .notNull()
+//     .references(() => user.id, { onDelete: 'cascade' }),
+//   title: text('title').notNull(), // GitHub, Gmail, Netflix, etc.
+//   username: text('username'),
+//   email: text('email'),
+//   passwordEncrypted: text('password_encrypted').notNull(),
+//   serviceUrl: text('service_url'),
+//   createdAt: timestamp('created_at').defaultNow().notNull(),
+//   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+// });
 
 // Relations
 export const userRelations = relations(user, ({ many }) => ({

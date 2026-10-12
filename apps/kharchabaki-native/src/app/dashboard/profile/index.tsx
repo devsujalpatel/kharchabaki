@@ -16,6 +16,8 @@ import { LogOut } from "lucide-react-native";
 import { router } from "expo-router";
 import { authClient } from "@/lib/auth-client";
 
+import { PreferencesSettings } from "@/components/PreferencesSettings";
+import { usePreferences } from "@/lib/preferences";
 import { api } from "@/lib/api";
 
 type User = {
@@ -84,6 +86,7 @@ async function addBalance(amount: number): Promise<BalanceResponse> {
 
 export default function Profile(): JSX.Element {
   const queryClient = useQueryClient();
+  const { formatMoney, colors } = usePreferences();
 
   const [amount, setAmount] = useState("");
 
@@ -114,6 +117,7 @@ export default function Profile(): JSX.Element {
     onSuccess: () => {
       setAmount("");
 
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
       queryClient.invalidateQueries({
         queryKey: ["balance"],
       });
@@ -122,18 +126,18 @@ export default function Profile(): JSX.Element {
 
   if (isUserLoading || isBalanceLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-black">
-        <ActivityIndicator size="small" color="#ffffff" />
+      <View className="flex-1 items-center justify-center bg-app-bg">
+        <ActivityIndicator size="small" color={colors.primary} />
 
-        <Text className="mt-3 text-sm text-zinc-500">Loading profile...</Text>
+        <Text className="mt-3 text-sm text-app-subtle">Loading profile...</Text>
       </View>
     );
   }
 
   if (userError || !meData?.data?.session?.user) {
     return (
-      <View className="flex-1 items-center justify-center bg-black px-6">
-        <Text className="text-base text-white">You are not authenticated.</Text>
+      <View className="flex-1 items-center justify-center bg-app-bg px-6">
+        <Text className="text-base text-app-text">You are not authenticated.</Text>
       </View>
     );
   }
@@ -150,7 +154,7 @@ export default function Profile(): JSX.Element {
   const handleBalanceSubmit = () => {
     const value = Number(amount);
 
-    if (!value || value < 0) {
+    if (!amount.trim() || !Number.isFinite(value) || value < 0) {
       return;
     }
 
@@ -159,7 +163,7 @@ export default function Profile(): JSX.Element {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-black"
+      className="flex-1 bg-app-bg"
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
@@ -170,20 +174,20 @@ export default function Profile(): JSX.Element {
         {/* Header */}
 
         <View className="mb-7">
-          <Text className="text-3xl font-semibold tracking-tight text-white">Profile</Text>
+          <Text className="text-3xl font-semibold tracking-tight text-app-text">Profile</Text>
 
-          <Text className="mt-1 text-sm text-zinc-500">
+          <Text className="mt-1 text-sm text-app-subtle">
             Manage your profile and account balance.
           </Text>
         </View>
 
         {/* Personal Information */}
 
-        <View className="rounded-[22px] border border-zinc-900 bg-[#050604]">
+        <View className="rounded-[22px] border border-app-border bg-app-card">
           <View className="p-5">
-            <Text className="text-lg font-medium text-white">Personal information</Text>
+            <Text className="text-lg font-medium text-app-text">Personal information</Text>
 
-            <Text className="mt-1 text-sm text-zinc-500">
+            <Text className="mt-1 text-sm text-app-subtle">
               Your account information from authentication.
             </Text>
 
@@ -198,15 +202,15 @@ export default function Profile(): JSX.Element {
                   className="h-16 w-16 rounded-full"
                 />
               ) : (
-                <View className="h-16 w-16 items-center justify-center rounded-full bg-zinc-800">
-                  <Text className="text-lg font-medium text-white">{initials}</Text>
+                <View className="h-16 w-16 items-center justify-center rounded-full bg-app-muted">
+                  <Text className="text-lg font-medium text-app-text">{initials}</Text>
                 </View>
               )}
 
               <View className="ml-4 flex-1">
-                <Text className="font-medium text-white">{user.name}</Text>
+                <Text className="font-medium text-app-text">{user.name}</Text>
 
-                <Text numberOfLines={1} className="mt-1 text-sm text-zinc-500">
+                <Text numberOfLines={1} className="mt-1 text-sm text-app-subtle">
                   {user.email}
                 </Text>
               </View>
@@ -214,22 +218,22 @@ export default function Profile(): JSX.Element {
 
             {/* Separator */}
 
-            <View className="my-6 h-px bg-zinc-900" />
+            <View className="my-6 h-px bg-app-muted" />
 
             {/* Name */}
 
             <View>
-              <Text className="text-sm text-zinc-500">Name</Text>
+              <Text className="text-sm text-app-subtle">Name</Text>
 
-              <Text className="mt-1 font-medium text-white">{user.name}</Text>
+              <Text className="mt-1 font-medium text-app-text">{user.name}</Text>
             </View>
 
             {/* Email */}
 
             <View className="mt-5">
-              <Text className="text-sm text-zinc-500">Email</Text>
+              <Text className="text-sm text-app-subtle">Email</Text>
 
-              <Text className="mt-1 font-medium text-white">{user.email}</Text>
+              <Text className="mt-1 font-medium text-app-text">{user.email}</Text>
             </View>
             <Pressable
               onPress={() => {
@@ -244,6 +248,7 @@ export default function Profile(): JSX.Element {
                     onPress: async () => {
                       try {
                         await authClient.signOut();
+                        queryClient.clear();
 
                         router.replace("/");
                       } catch (error) {
@@ -266,38 +271,38 @@ export default function Profile(): JSX.Element {
 
         {/* Balance */}
 
-        <View className="mt-6 rounded-[22px] border border-zinc-900 bg-[#050604]">
+        <View className="mt-6 rounded-[22px] border border-app-border bg-app-card">
           <View className="p-5">
-            <Text className="text-lg font-medium text-white">Balance</Text>
+            <Text className="text-lg font-medium text-app-text">Balance</Text>
 
-            <Text className="mt-1 text-sm leading-5 text-zinc-500">
+            <Text className="mt-1 text-sm leading-5 text-app-subtle">
               Set the amount you already have before tracking transactions.
             </Text>
 
             {/* Current balance */}
 
             <View className="mt-6">
-              <Text className="text-sm text-zinc-500">Current balance</Text>
+              <Text className="text-sm text-app-subtle">Current balance</Text>
 
               {balanceError ? (
                 <Text className="mt-1 text-sm text-red-400">Failed to load balance.</Text>
               ) : (
-                <Text className="mt-1 text-3xl font-semibold tracking-tight text-white">
-                  ₹{balanceData?.data.balance.toLocaleString("en-IN")}
+                <Text className="mt-1 text-3xl font-semibold tracking-tight text-app-text">
+                  {formatMoney(balanceData?.data.balance ?? 0)}
                 </Text>
               )}
             </View>
 
             {/* Separator */}
 
-            <View className="my-6 h-px bg-zinc-900" />
+            <View className="my-6 h-px bg-app-muted" />
 
             {/* Opening balance */}
 
             <View>
-              <Text className="text-sm font-medium text-white">Opening balance</Text>
+              <Text className="text-sm font-medium text-app-text">Opening balance</Text>
 
-              <Text className="mt-1 text-xs text-zinc-500">
+              <Text className="mt-1 text-xs text-app-subtle">
                 This will replace your current opening balance.
               </Text>
 
@@ -308,7 +313,7 @@ export default function Profile(): JSX.Element {
                 keyboardType="decimal-pad"
                 placeholder="25000"
                 placeholderTextColor="#71717a"
-                className="mt-3 h-11 rounded-xl border border-zinc-800 bg-[#0c0e09] px-3 text-base text-white"
+                className="mt-3 h-11 rounded-xl border border-app-border bg-app-bg px-3 text-base text-app-text"
               />
 
               {/* Update */}
@@ -317,22 +322,25 @@ export default function Profile(): JSX.Element {
                 disabled={isUpdatingBalance || !amount || Number(amount) < 0}
                 onPress={handleBalanceSubmit}
                 className={`mt-3 h-11 items-center justify-center rounded-xl ${
-                  isUpdatingBalance || !amount || Number(amount) < 0 ? "bg-lime-900" : "bg-lime-600"
+                  isUpdatingBalance || !amount || Number(amount) < 0
+                    ? "bg-app-muted"
+                    : "bg-app-primary"
                 }`}
               >
                 {isUpdatingBalance ? (
                   <View className="flex-row items-center">
-                    <ActivityIndicator size="small" color="#000" />
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
 
-                    <Text className="ml-2 font-medium text-black">Updating...</Text>
+                    <Text className="ml-2 font-medium text-app-on-primary">Updating...</Text>
                   </View>
                 ) : (
-                  <Text className="font-medium text-black">Update balance</Text>
+                  <Text className="font-medium text-app-on-primary">Update balance</Text>
                 )}
               </Pressable>
             </View>
           </View>
         </View>
+        <PreferencesSettings />
       </ScrollView>
     </KeyboardAvoidingView>
   );

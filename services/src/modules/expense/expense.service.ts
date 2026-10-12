@@ -3,30 +3,8 @@ import { desc, eq, sql } from 'drizzle-orm';
 import { db } from '../../database/client.js';
 import { expense, user } from '../../database/schema.js';
 
-type CreateExpenseInput = {
-  amount: number;
-  category:
-    | 'food'
-    | 'travel'
-    | 'shopping'
-    | 'bills'
-    | 'rent'
-    | 'phone'
-    | 'beauty'
-    | 'clothing'
-    | 'fuel'
-    | 'gifts'
-    | 'electronics'
-    | 'snacks'
-    | 'vegetables'
-    | 'fruits'
-    | 'repairs'
-    | 'health'
-    | 'education'
-    | 'entertainment'
-    | 'other';
-  description?: string;
-};
+import { type ExpenseInput as CreateExpenseInput } from '../transactions/transaction.schema.js';
+import { ApiError } from '../../utils/api-error.js';
 
 export const createExpense = async (
   userId: string,
@@ -40,7 +18,8 @@ export const createExpense = async (
       })
       .from(user)
       .where(eq(user.id, userId))
-      .limit(1);
+      .limit(1)
+      .for('update');
 
     if (!currentUser) {
       throw new Error('User not found');
@@ -49,7 +28,7 @@ export const createExpense = async (
     const currentBalance = Number(currentUser.balance);
 
     if (currentBalance < data.amount) {
-      throw new Error('Insufficient balance');
+      throw new ApiError(400, 'Insufficient balance');
     }
 
     // Create expense
@@ -59,6 +38,7 @@ export const createExpense = async (
         userId,
         amount: data.amount.toFixed(2),
         category: data.category,
+        spentAt: data.occurredAt ? new Date(data.occurredAt) : new Date(),
         description: data.description?.trim() || null,
       })
       .returning();
@@ -79,7 +59,6 @@ export const createExpense = async (
   });
 };
 
-
 export const getExpense = async (userId: string) => {
   return db
     .select({
@@ -92,5 +71,5 @@ export const getExpense = async (userId: string) => {
     })
     .from(expense)
     .where(eq(expense.userId, userId))
-    .orderBy(desc(expense.createdAt));
+    .orderBy(desc(expense.spentAt));
 };

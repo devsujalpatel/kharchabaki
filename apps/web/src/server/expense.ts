@@ -1,28 +1,10 @@
+import type { ExpenseCategory } from "@/lib/finance";
 import { api } from "@/lib/api";
 
 export type Expense = {
   id: string;
   amount: string;
-  category:
-    | "food"
-    | "travel"
-    | "shopping"
-    | "bills"
-    | "rent"
-    | "phone"
-    | "beauty"
-    | "clothing"
-    | "fuel"
-    | "gifts"
-    | "electronics"
-    | "snacks"
-    | "vegetables"
-    | "fruits"
-    | "repairs"
-    | "health"
-    | "education"
-    | "entertainment"
-    | "other";
+  category: ExpenseCategory;
   description: string | null;
   spentAt: string;
   createdAt: string;
