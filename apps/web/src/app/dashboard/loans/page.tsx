@@ -1,15 +1,23 @@
 "use client";
+
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Check,
+  ChevronDown,
+  HandCoins,
+  Loader2,
+  Plus,
+  WifiOff,
+} from "lucide-react";
 import { useOfflineStatus } from "@/components/providers/session-provider";
 import { usePreferences } from "@/components/providers/preferences-provider";
-
-import { SubmitEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownLeft, ArrowUpRight, HandCoins, Loader2 } from "lucide-react";
-
+import { cn } from "@/lib/utils";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   createGivenLoan,
   createTakenLoan,
@@ -22,277 +30,333 @@ import {
 } from "@/server/loan";
 
 type LoanKind = "taken" | "given";
-
-const initialForm = {
-  amount: "",
-  person: "",
-  dueDate: "",
-  interest: "0.00",
-};
+type Loan = TakenLoan | GivenLoan;
 
 export default function LoansPage() {
   const queryClient = useQueryClient();
   const offline = useOfflineStatus();
   const { formatMoney } = usePreferences();
   const [kind, setKind] = useState<LoanKind>("taken");
-  const [form, setForm] = useState(initialForm);
-
-  const takenLoansQuery = useQuery({
+  const [adding, setAdding] = useState(false);
+  const taken = useQuery({
     queryKey: ["loans", "taken"],
     queryFn: getTakenLoans,
   });
-  const givenLoansQuery = useQuery({
+  const given = useQuery({
     queryKey: ["loans", "given"],
     queryFn: getGivenLoans,
   });
-
-  const refreshLoans = () => {
-    void queryClient.invalidateQueries({ queryKey: ["loans"] });
-    void queryClient.invalidateQueries({ queryKey: ["balance"] });
-    void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+  const query = kind === "taken" ? taken : given;
+  const loans: Loan[] = query.data?.data ?? [];
+  const canWrite = offline.online && !offline.pending;
+  const refresh = () => {
+    for (const key of ["loans", "balance", "dashboard-summary"])
+      void queryClient.invalidateQueries({ queryKey: [key] });
   };
+  const outstanding = loans.reduce(
+    (sum, loan) =>
+      sum + Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount)),
+    0,
+  );
+  return (
+    <div className="space-y-5 pb-24">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">Loans</h1>
+        <Button
+          onClick={() => setAdding(true)}
+          disabled={!canWrite}
+          className="h-10 rounded-xl"
+          aria-haspopup="dialog"
+        >
+          <Plus className="size-4" />
+          Add loan
+        </Button>
+      </div>
+      <div
+        role="tablist"
+        aria-label="Loan direction"
+        className="grid grid-cols-2 gap-1 rounded-2xl bg-muted/60 p-1"
+      >
+        {(["taken", "given"] as const).map((option) => (
+          <Button
+            key={option}
+            id={`loan-tab-${option}`}
+            role="tab"
+            aria-selected={kind === option}
+            aria-controls={`loans-${option}`}
+            tabIndex={kind === option ? 0 : -1}
+            variant={kind === option ? "default" : "ghost"}
+            onClick={() => setKind(option)}
+            onKeyDown={(event) => {
+              if (
+                !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+              )
+                return;
+              event.preventDefault();
+              const next =
+                event.key === "Home"
+                  ? "taken"
+                  : event.key === "End"
+                    ? "given"
+                    : kind === "taken"
+                      ? "given"
+                      : "taken";
+              setKind(next);
+              document.getElementById(`loan-tab-${next}`)?.focus();
+            }}
+            className={cn(
+              "h-12 rounded-xl text-sm",
+              kind === option &&
+                "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground",
+            )}
+          >
+            {option === "taken" ? (
+              <ArrowDownLeft className="size-4" />
+            ) : (
+              <ArrowUpRight className="size-4" />
+            )}
+            {option === "taken" ? "I borrowed" : "I lent"}
+          </Button>
+        ))}
+      </div>
+      {!canWrite && (
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <WifiOff className="size-3.5 shrink-0" />
+          Connect and finish syncing to add or repay loans.
+        </p>
+      )}
+      <section
+        role="tabpanel"
+        id={`loans-${kind}`}
+        aria-labelledby={`loan-tab-${kind}`}
+        className="space-y-4"
+      >
+        <div
+          className={cn(
+            "rounded-2xl border p-5",
+            kind === "taken"
+              ? "border-amber-500/20 bg-amber-500/5"
+              : "border-emerald-500/20 bg-emerald-500/5",
+          )}
+        >
+          <p className="text-xs font-medium text-muted-foreground">
+            {kind === "taken" ? "Left to repay" : "Owed to you"}
+          </p>
+          {query.isPending ? (
+            <div className="mt-2 h-8 w-36 animate-pulse rounded bg-muted" />
+          ) : (
+            <p
+              className="mt-1 truncate text-3xl font-semibold tracking-tight tabular-nums"
+              title={formatMoney(outstanding)}
+            >
+              {formatMoney(outstanding)}
+            </p>
+          )}
+        </div>
+        <div className="overflow-hidden rounded-2xl border bg-card">
+          {query.isPending ? (
+            <div
+              className="space-y-5 p-5"
+              role="status"
+              aria-label="Loading loans"
+            >
+              {[0, 1].map((row) => (
+                <div key={row} className="space-y-3">
+                  <div className="h-5 w-1/3 animate-pulse rounded bg-muted" />
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+                </div>
+              ))}
+            </div>
+          ) : query.error ? (
+            <div className="p-5">
+              <p role="alert" className="text-sm text-destructive">
+                {query.error.message}
+              </p>
+              <Button
+                variant="outline"
+                className="mt-3"
+                onClick={() => query.refetch()}
+              >
+                Retry
+              </Button>
+            </div>
+          ) : !loans.length ? (
+            <div className="flex min-h-56 flex-col items-center justify-center gap-3 px-6 text-muted-foreground">
+              <HandCoins className="size-8 opacity-50" />
+              <p className="text-sm">
+                No {kind === "taken" ? "borrowed" : "lent"} loans yet
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {loans.map((loan) => (
+                <LoanRow
+                  key={`${kind}-${loan.id}`}
+                  kind={kind}
+                  loan={loan}
+                  onRefresh={refresh}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+      {adding && (
+        <LoanComposer
+          kind={kind}
+          onClose={() => setAdding(false)}
+          onRefresh={refresh}
+        />
+      )}
+    </div>
+  );
+}
 
-  const createMutation = useMutation<TakenLoan | GivenLoan>({
+function LoanComposer({
+  kind,
+  onClose,
+  onRefresh,
+}: {
+  kind: LoanKind;
+  onClose: () => void;
+  onRefresh: () => void;
+}) {
+  const offline = useOfflineStatus();
+  const [form, setForm] = useState({
+    amount: "",
+    person: "",
+    dueDate: "",
+    interest: "0.00",
+  });
+  const [validation, setValidation] = useState("");
+  const mutation = useMutation<Loan>({
     mutationFn: () =>
       kind === "taken"
         ? createTakenLoan({
             amount: form.amount,
-            borrowedFrom: form.person,
+            borrowedFrom: form.person.trim(),
             dueDate: form.dueDate,
             interest: form.interest,
           }).then((response) => response.data)
         : createGivenLoan({
             amount: form.amount,
-            borrowerName: form.person,
+            borrowerName: form.person.trim(),
             dueDate: form.dueDate,
             interest: form.interest,
           }).then((response) => response.data),
     onSuccess: () => {
-      setForm(initialForm);
-      refreshLoans();
+      onRefresh();
+      onClose();
     },
   });
-
-  const submitLoan = (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    createMutation.mutate();
-  };
-
-  const takenLoans = takenLoansQuery.data?.data ?? [];
-  const givenLoans = givenLoansQuery.data?.data ?? [];
-  const isLoading = takenLoansQuery.isPending || givenLoansQuery.isPending;
-  const hasError = takenLoansQuery.isError || givenLoansQuery.isError;
-
   return (
-    <div className="space-y-6">
-      <div className="sm:mt-10">
-        <h1 className="text-2xl font-semibold tracking-tight">Loans</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Track money you borrow and lend, including repayments.
-        </p>
-      </div>
-
-      {!isLoading && !hasError && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Card className="rounded-2xl border-amber-500/20 bg-amber-500/5">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Still to repay</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">
-                {formatMoney(takenLoans.reduce((sum, loan) => sum + Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount)), 0))}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="rounded-2xl border-emerald-500/20 bg-emerald-500/5">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Still owed to you</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">
-                {formatMoney(givenLoans.reduce((sum, loan) => sum + Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount)), 0))}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle className="text-base">Add a loan</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-muted p-1">
-            <Button
-              type="button"
-              variant={kind === "taken" ? "secondary" : "ghost"}
-              onClick={() => setKind("taken")}
-            >
-              I borrowed money
-            </Button>
-            <Button
-              type="button"
-              variant={kind === "given" ? "secondary" : "ghost"}
-              onClick={() => setKind("given")}
-            >
-              I lent money
-            </Button>
-          </div>
-
-          <form
-            onSubmit={submitLoan}
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-          >
-            <Field label="Amount" id="loan-amount">
+    <FormDialog
+      title={kind === "taken" ? "Borrowed loan" : "Lent loan"}
+      icon={kind === "taken" ? ArrowDownLeft : ArrowUpRight}
+      onClose={onClose}
+      busy={mutation.isPending}
+    >
+      <form
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!form.person.trim()) {
+            setValidation("Enter a name.");
+            return;
+          }
+          setValidation("");
+          mutation.mutate();
+        }}
+      >
+        <fieldset disabled={mutation.isPending} className="space-y-4">
+          <label className="block space-y-2">
+            <span className="text-sm font-medium">Amount</span>
+            <Input
+              type="number"
+              min="0.01"
+              max="999999999999.99"
+              step="0.01"
+              inputMode="decimal"
+              required
+              value={form.amount}
+              onChange={(event) =>
+                setForm({ ...form, amount: event.target.value })
+              }
+              placeholder="0.00"
+              className="h-14 rounded-2xl text-2xl font-semibold md:text-2xl"
+            />
+          </label>
+          <label className="block space-y-2">
+            <span className="text-sm font-medium">
+              {kind === "taken" ? "Borrowed from" : "Lent to"}
+            </span>
+            <Input
+              required
+              maxLength={100}
+              value={form.person}
+              onChange={(event) =>
+                setForm({ ...form, person: event.target.value })
+              }
+              placeholder="Name"
+              className="h-11 rounded-xl"
+            />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block min-w-0 space-y-2">
+              <span className="text-sm font-medium">Due date</span>
               <Input
-                id="loan-amount"
-                type="number"
-                min="0.01"
-                step="0.01"
-                required
-                value={form.amount}
-                onChange={(event) =>
-                  setForm({ ...form, amount: event.target.value })
-                }
-                placeholder="5000"
-              />
-            </Field>
-            <Field
-              label={kind === "taken" ? "Borrowed from" : "Borrower name"}
-              id="loan-person"
-            >
-              <Input
-                id="loan-person"
-                required
-                maxLength={100}
-                value={form.person}
-                onChange={(event) =>
-                  setForm({ ...form, person: event.target.value })
-                }
-                placeholder={
-                  kind === "taken" ? "Bank or person" : "Person's name"
-                }
-              />
-            </Field>
-            <Field label="Due date" id="loan-due-date">
-              <Input
-                id="loan-due-date"
                 type="date"
                 required
                 value={form.dueDate}
                 onChange={(event) =>
                   setForm({ ...form, dueDate: event.target.value })
                 }
+                className="h-11 rounded-xl"
               />
-            </Field>
-            <Field label="Interest (%)" id="loan-interest">
+            </label>
+            <label className="block min-w-0 space-y-2">
+              <span className="text-sm font-medium">Interest %</span>
               <Input
-                id="loan-interest"
                 type="number"
                 min="0"
                 step="0.01"
+                inputMode="decimal"
                 required
                 value={form.interest}
                 onChange={(event) =>
                   setForm({ ...form, interest: event.target.value })
                 }
+                className="h-11 rounded-xl"
               />
-            </Field>
-            <div className="sm:col-span-2 lg:col-span-4">
-              <Button
-                type="submit"
-                disabled={
-                  !offline.online ||
-                  offline.pending > 0 ||
-                  createMutation.isPending
-                }
-              >
-                {createMutation.isPending && (
-                  <Loader2 className="size-4 animate-spin" />
-                )}
-                Add {kind === "taken" ? "borrowed" : "given"} loan
-              </Button>
-              {createMutation.isError && (
-                <p className="mt-2 text-sm text-destructive">
-                  Unable to create the loan. Please check the details and try
-                  again.
-                </p>
-              )}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      {hasError ? (
-        <Card className="rounded-2xl">
-          <CardContent className="py-12 text-center text-sm text-destructive">
-            Failed to load loans.
-          </CardContent>
-        </Card>
-      ) : isLoading ? (
-        <Card className="rounded-2xl">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            Loading loans…
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6 lg:grid-cols-2 mb-20 sm:mb-0">
-          <LoanList kind="taken" loans={takenLoans} onRefresh={refreshLoans} />
-          <LoanList kind="given" loans={givenLoans} onRefresh={refreshLoans} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function LoanList({
-  kind,
-  loans,
-  onRefresh,
-}: {
-  kind: LoanKind;
-  loans: TakenLoan[] | GivenLoan[];
-  onRefresh: () => void;
-}) {
-  const isTaken = kind === "taken";
-
-  return (
-    <Card className="rounded-2xl">
-      <CardHeader className="border-b">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <span
-            className={
-              isTaken
-                ? "rounded-lg bg-amber-500/10 p-2 text-amber-600"
-                : "rounded-lg bg-emerald-500/10 p-2 text-emerald-600"
-            }
-          >
-            {isTaken ? (
-              <ArrowDownLeft className="size-4" />
-            ) : (
-              <ArrowUpRight className="size-4" />
-            )}
-          </span>
-          {isTaken ? "Money borrowed" : "Money lent"}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        {loans.length === 0 ? (
-          <div className="flex min-h-48 flex-col items-center justify-center px-6 text-center">
-            <HandCoins className="size-5 text-muted-foreground" />
-            <p className="mt-3 text-sm text-muted-foreground">
-              No {isTaken ? "borrowed" : "given"} loans yet.
-            </p>
+            </label>
           </div>
-        ) : (
-          <div className="divide-y">
-            {loans.map((loan) => (
-              <LoanRow
-                key={loan.id}
-                kind={kind}
-                loan={loan}
-                onRefresh={onRefresh}
-              />
-            ))}
-          </div>
+        </fieldset>
+        {(validation || mutation.error) && (
+          <p role="alert" className="text-sm text-destructive">
+            {validation || mutation.error?.message}
+          </p>
         )}
-      </CardContent>
-    </Card>
+        {(!offline.online || offline.pending > 0) && (
+          <p className="text-xs text-muted-foreground">
+            Connect and finish syncing to save.
+          </p>
+        )}
+        <Button
+          type="submit"
+          disabled={
+            !offline.online || offline.pending > 0 || mutation.isPending
+          }
+          className="h-12 w-full rounded-xl font-semibold"
+        >
+          {mutation.isPending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Check className="size-4" />
+          )}
+          Save loan
+        </Button>
+      </form>
+    </FormDialog>
   );
 }
 
@@ -302,130 +366,249 @@ function LoanRow({
   onRefresh,
 }: {
   kind: LoanKind;
-  loan: TakenLoan | GivenLoan;
+  loan: Loan;
+  onRefresh: () => void;
+}) {
+  const offline = useOfflineStatus();
+  const { formatMoney } = usePreferences();
+  const [paying, setPaying] = useState(false);
+  const person = "borrowedFrom" in loan ? loan.borrowedFrom : loan.borrowerName;
+  const outstanding = Math.max(
+    0,
+    Number(loan.totalAmount) - Number(loan.paidAmount),
+  );
+  const progress =
+    Number(loan.totalAmount) > 0
+      ? Math.min(
+          100,
+          (Number(loan.paidAmount) / Number(loan.totalAmount)) * 100,
+        )
+      : 0;
+  return (
+    <article className="p-4 sm:p-5">
+      <div className="flex items-center gap-3">
+        <span
+          className={cn(
+            "flex size-10 shrink-0 items-center justify-center rounded-2xl",
+            kind === "taken"
+              ? "bg-amber-500/10 text-amber-500"
+              : "bg-emerald-500/10 text-emerald-500",
+          )}
+        >
+          {kind === "taken" ? (
+            <ArrowDownLeft className="size-4" />
+          ) : (
+            <ArrowUpRight className="size-4" />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold" title={person}>
+            {person}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Due {formatDate(loan.dueDate)}
+          </p>
+        </div>
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold capitalize",
+            loan.status === "paid"
+              ? "bg-emerald-500/10 text-emerald-500"
+              : loan.status === "overdue"
+                ? "bg-red-500/10 text-red-500"
+                : "bg-primary/10 text-primary",
+          )}
+        >
+          {loan.status}
+        </span>
+      </div>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] text-muted-foreground">Remaining</p>
+          <p
+            className="truncate text-xl font-semibold tabular-nums"
+            title={formatMoney(outstanding)}
+          >
+            {formatMoney(outstanding)}
+          </p>
+        </div>
+        {loan.status !== "paid" && (
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-11 shrink-0 rounded-2xl border-primary/20 bg-primary/5 text-primary"
+            aria-label={`Record ${kind === "taken" ? "repayment to" : "payment from"} ${person}`}
+            title="Record payment"
+            aria-haspopup="dialog"
+            disabled={!offline.online || offline.pending > 0}
+            onClick={() => setPaying(true)}
+          >
+            <HandCoins className="size-5" />
+          </Button>
+        )}
+      </div>
+      <div
+        className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+        aria-label={`Repayment progress for ${person}`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progress)}
+      >
+        <div
+          className="h-full rounded-full bg-primary"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <details className="group mt-3">
+        <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground">
+          Details
+          <ChevronDown className="size-3 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="mt-3 space-y-2 rounded-xl bg-muted/40 p-3 text-xs">
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Total</span>
+            <span className="truncate tabular-nums">
+              {formatMoney(loan.totalAmount)}
+            </span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Paid</span>
+            <span className="truncate tabular-nums">
+              {formatMoney(loan.paidAmount)}
+            </span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Interest</span>
+            <span>{loan.interest}%</span>
+          </div>
+          {loan.payments?.length > 0 && (
+            <div className="space-y-2 border-t pt-2">
+              {loan.payments.map((payment) => (
+                <div key={payment.id} className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">
+                    {formatDate(payment.paidAt)}
+                  </span>
+                  <span className="truncate tabular-nums">
+                    {formatMoney(payment.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </details>
+      {paying && (
+        <PaymentComposer
+          key={loan.id}
+          kind={kind}
+          loan={loan}
+          person={person}
+          onClose={() => setPaying(false)}
+          onRefresh={onRefresh}
+        />
+      )}
+    </article>
+  );
+}
+
+function PaymentComposer({
+  kind,
+  loan,
+  person,
+  onClose,
+  onRefresh,
+}: {
+  kind: LoanKind;
+  loan: Loan;
+  person: string;
+  onClose: () => void;
   onRefresh: () => void;
 }) {
   const offline = useOfflineStatus();
   const { formatMoney } = usePreferences();
   const [amount, setAmount] = useState("");
-  const isTaken = kind === "taken";
-  const person = "borrowedFrom" in loan ? loan.borrowedFrom : loan.borrowerName;
-  const outstanding = Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount));
-  const paidProgress = Number(loan.totalAmount) > 0 ? Math.min(100, (Number(loan.paidAmount) / Number(loan.totalAmount)) * 100) : 0;
-  const paymentMutation = useMutation({
+  const outstanding = Math.max(
+    0,
+    Number(loan.totalAmount) - Number(loan.paidAmount),
+  );
+  const mutation = useMutation({
     mutationFn: () =>
-      isTaken
+      kind === "taken"
         ? recordTakenLoanPayment({ loanId: loan.id, amount })
         : recordGivenLoanPayment({ loanId: loan.id, amount }),
     onSuccess: () => {
-      setAmount("");
       onRefresh();
+      onClose();
     },
   });
-
   return (
-    <div className="p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="font-medium">{person}</p>
+    <FormDialog
+      title="Record payment"
+      icon={HandCoins}
+      onClose={onClose}
+      busy={mutation.isPending}
+    >
+      <form
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const value = Number(amount);
+          if (!Number.isFinite(value) || value <= 0 || value > outstanding)
+            return;
+          mutation.mutate();
+        }}
+      >
+        <div className="rounded-2xl bg-muted/40 p-4">
+          <p className="truncate text-sm font-semibold" title={person}>
+            {person}
+          </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Due {formatDate(loan.dueDate)} · {loan.interest}% interest
+            Remaining {formatMoney(outstanding)}
           </p>
         </div>
-        <span
-          className={
-            loan.status === "paid"
-              ? "rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-700"
-              : loan.status === "overdue"
-                ? "rounded-full bg-red-500/10 px-2 py-1 text-xs font-medium text-red-700"
-                : "rounded-full bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700"
-          }
-        >
-          {loan.status}
-        </span>
-      </div>
-      <div className="mt-4 flex items-end justify-between gap-4">
-        <div>
-          <p className="text-xs text-muted-foreground">Outstanding</p>
-          <p className="text-lg font-semibold">{formatMoney(outstanding)}</p>
-          <p className="text-xs text-muted-foreground">
-            Paid {formatMoney(Number(loan.paidAmount))} of {formatMoney(Number(loan.totalAmount))}
+        <label className="block space-y-2">
+          <span className="text-sm font-medium">Amount</span>
+          <Input
+            type="number"
+            min="0.01"
+            max={outstanding}
+            step="0.01"
+            inputMode="decimal"
+            required
+            disabled={mutation.isPending}
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            placeholder="0.00"
+            className="h-14 rounded-2xl text-2xl font-semibold md:text-2xl"
+          />
+        </label>
+        {mutation.error && (
+          <p role="alert" className="text-sm text-destructive">
+            {mutation.error.message}
           </p>
-          <div className="mt-2 h-2 w-40 max-w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`Loan repayment progress for ${person}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(paidProgress)}>
-            <div className="h-full rounded-full bg-primary" style={{ width: `${paidProgress}%` }} />
-          </div>
-        </div>
-        {loan.status !== "paid" && (
-          <form
-            className="flex flex-wrap items-end gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const value = Number(amount);
-              if (!Number.isFinite(value) || value <= 0 || value > outstanding) return;
-              paymentMutation.mutate();
-            }}
-          >
-            <div className="space-y-2">
-              <Label htmlFor={`payment-${loan.id}`}>Payment amount</Label>
-              <Input
-                id={`payment-${loan.id}`}
-                type="number"
-                min="0.01"
-                max={outstanding}
-                step="0.01"
-                required
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                className="w-32"
-                placeholder="0.00"
-              />
-            </div>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={
-                !offline.online ||
-                offline.pending > 0 ||
-                paymentMutation.isPending
-              }
-            >
-              {paymentMutation.isPending ? (
-                <><Loader2 className="size-4 animate-spin" /> Recording…</>
-              ) : (
-                "Record payment"
-              )}
-            </Button>
-          </form>
         )}
-      </div>
-      {paymentMutation.isError && (
-        <p className="mt-2 text-xs text-destructive">
-          {paymentMutation.error.message || "Unable to record payment."}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function Field({
-  label,
-  id,
-  children,
-}: {
-  label: string;
-  id: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      {children}
-    </div>
+        <Button
+          type="submit"
+          disabled={
+            !offline.online || offline.pending > 0 || mutation.isPending
+          }
+          className="h-12 w-full rounded-xl"
+        >
+          {mutation.isPending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Check className="size-4" />
+          )}
+          Save payment
+        </Button>
+      </form>
+    </FormDialog>
   );
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-IN", {
+  return new Intl.DateTimeFormat("en", {
     day: "numeric",
     month: "short",
     year: "numeric",

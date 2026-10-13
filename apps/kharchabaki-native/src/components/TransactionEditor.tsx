@@ -1,20 +1,13 @@
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { DateField } from "@/components/DateField";
+import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { Check, CircleAlert } from "lucide-react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { CategoryPicker } from "@/components/CategoryPicker";
+import { DateField } from "@/components/DateField";
+import { FormSheet } from "@/components/FormSheet";
 import {
-  categoryIcon,
   expenseCategories,
   incomeSources,
-  formatLabel,
   type ExpenseCategory,
   type IncomeSource,
 } from "@/lib/finance";
@@ -28,7 +21,7 @@ export function TransactionEditor({
   transaction: Transaction;
   onClose: () => void;
 }) {
-  const { colors } = usePreferences();
+  const { colors, currency } = usePreferences();
   const client = useQueryClient();
   const [amount, setAmount] = useState(transaction.amount);
   const [category, setCategory] = useState(transaction.source ?? transaction.category ?? "other");
@@ -50,106 +43,91 @@ export function TransactionEditor({
     Number.isFinite(Number(amount)) &&
     Number(amount) >= 0.01 &&
     options.some((option) => option === category);
+  const save = () =>
+    mutation.mutate({
+      transaction,
+      data: {
+        amount: Number(amount),
+        description,
+        occurredAt:
+          date === transaction.occurredAt.slice(0, 10)
+            ? transaction.occurredAt
+            : `${date}T00:00:00.000Z`,
+        ...(transaction.type === "income"
+          ? { source: category as IncomeSource }
+          : { category: category as ExpenseCategory }),
+      },
+    });
+
   return (
-    <Modal
+    <FormSheet
       visible
-      transparent
-      animationType="slide"
-      onRequestClose={() => {
-        if (!mutation.isPending) onClose();
-      }}
+      title={`Edit ${transaction.type}`}
+      onClose={onClose}
+      disabled={mutation.isPending}
+      footer={
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Save transaction"
+          disabled={!valid || mutation.isPending}
+          onPress={save}
+          className={`h-14 flex-row items-center justify-center gap-2 rounded-2xl bg-app-primary ${!valid || mutation.isPending ? "opacity-50" : ""}`}
+        >
+          {mutation.isPending ? (
+            <ActivityIndicator color={colors.onPrimary} />
+          ) : (
+            <>
+              <Check size={20} color={colors.onPrimary} />
+              <Text className="font-semibold text-app-on-primary">Save</Text>
+            </>
+          )}
+        </Pressable>
+      }
     >
-      <View className="flex-1 justify-end bg-black/60">
-        <View className="max-h-[90%] rounded-t-3xl bg-app-card p-5 pb-10">
-          <ScrollView keyboardShouldPersistTaps="handled">
-            <Text className="mb-5 text-xl font-semibold text-app-text">
-              Edit {transaction.type}
-            </Text>
-            <Text className="mb-2 text-app-subtle">Amount</Text>
-            <TextInput
-              accessibilityLabel="Amount"
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-              editable={!mutation.isPending}
-              className="h-12 rounded-xl border border-app-border px-3 text-app-text"
-            />
-            <Text className="mb-2 mt-5 text-app-subtle">
-              {transaction.type === "income" ? "Source" : "Category"}
-            </Text>
-            <View className="flex-row flex-wrap gap-2">
-              {options.map((option) => {
-                const Icon = categoryIcon(option);
-                const selected = category === option;
-                return (
-                  <Pressable
-                    key={option}
-                    disabled={mutation.isPending}
-                    onPress={() => setCategory(option)}
-                    className={`flex-row items-center gap-2 rounded-xl border px-3 py-2 ${selected ? "border-app-primary bg-app-primary" : "border-app-border"}`}
-                  >
-                    <Icon size={14} color={selected ? colors.onPrimary : colors.subtle} />
-                    <Text className={selected ? "text-app-on-primary" : "text-app-text"}>
-                      {formatLabel(option)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <DateField value={date} onChange={setDate} disabled={mutation.isPending} />
-            <Text className="mb-2 mt-5 text-app-subtle">Description</Text>
-            <TextInput
-              accessibilityLabel="Description"
-              value={description}
-              onChangeText={setDescription}
-              editable={!mutation.isPending}
-              multiline
-              maxLength={1000}
-              className="min-h-20 rounded-xl border border-app-border p-3 text-app-text"
-            />
-            {mutation.error && (
-              <Text accessibilityRole="alert" className="mt-3 text-red-400">
-                {mutation.error.message}
-              </Text>
-            )}
-            <View className="mt-5 flex-row gap-3">
-              <Pressable
-                disabled={mutation.isPending}
-                onPress={onClose}
-                className="flex-1 items-center rounded-xl border border-app-border p-3"
-              >
-                <Text className="text-app-text">Cancel</Text>
-              </Pressable>
-              <Pressable
-                disabled={!valid || mutation.isPending}
-                onPress={() =>
-                  mutation.mutate({
-                    transaction,
-                    data: {
-                      amount: Number(amount),
-                      description,
-                      occurredAt:
-                        date === transaction.occurredAt.slice(0, 10)
-                          ? transaction.occurredAt
-                          : `${date}T00:00:00.000Z`,
-                      ...(transaction.type === "income"
-                        ? { source: category as IncomeSource }
-                        : { category: category as ExpenseCategory }),
-                    },
-                  })
-                }
-                className={`flex-1 items-center rounded-xl bg-app-primary p-3 ${!valid ? "opacity-40" : ""}`}
-              >
-                {mutation.isPending ? (
-                  <ActivityIndicator color={colors.onPrimary} />
-                ) : (
-                  <Text className="font-semibold text-app-on-primary">Save changes</Text>
-                )}
-              </Pressable>
-            </View>
-          </ScrollView>
-        </View>
+      <Text className="mb-2 text-sm font-medium text-app-subtle">Amount</Text>
+      <View className="mb-5 flex-row items-center gap-3 rounded-2xl border border-app-border bg-app-bg px-4">
+        <Text className="text-sm font-semibold text-app-subtle">{currency}</Text>
+        <TextInput
+          accessibilityLabel="Amount"
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="decimal-pad"
+          editable={!mutation.isPending}
+          placeholder="0.00"
+          placeholderTextColor={colors.subtle}
+          className="h-16 min-w-0 flex-1 text-3xl font-semibold text-app-text"
+        />
       </View>
-    </Modal>
+      <CategoryPicker
+        value={category}
+        onChange={setCategory}
+        options={options}
+        label={transaction.type === "income" ? "Source" : "Category"}
+        disabled={mutation.isPending}
+      />
+      <DateField value={date} onChange={setDate} disabled={mutation.isPending} />
+      <Text className="mb-2 mt-5 text-sm font-medium text-app-subtle">Note</Text>
+      <TextInput
+        accessibilityLabel="Description"
+        value={description}
+        onChangeText={setDescription}
+        editable={!mutation.isPending}
+        placeholder="Optional"
+        placeholderTextColor={colors.subtle}
+        multiline
+        maxLength={1000}
+        textAlignVertical="top"
+        className="min-h-24 rounded-2xl border border-app-border bg-app-bg p-4 text-app-text"
+      />
+      {mutation.error && (
+        <View
+          accessibilityRole="alert"
+          className="mt-4 flex-row items-start gap-2 rounded-xl bg-app-muted p-3"
+        >
+          <CircleAlert size={18} color={colors.subtle} />
+          <Text className="min-w-0 flex-1 text-sm text-app-text">{mutation.error.message}</Text>
+        </View>
+      )}
+    </FormSheet>
   );
 }

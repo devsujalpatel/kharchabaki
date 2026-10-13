@@ -16,7 +16,8 @@
         "backgroundColor": "#071A12"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.kharchabakinative"
+      "package": "com.anonymous.kharchabakinative",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "scheme": "kharchabaki",
     "plugins": [

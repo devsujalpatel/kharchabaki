@@ -1,8 +1,15 @@
 import { usePreferences } from "@/lib/preferences";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Pressable, Text, View, Image } from "react-native";
+import { useEffect, useState } from "react";
+import { Keyboard, Pressable, Text, View, Image } from "react-native";
 import { usePathname, router } from "expo-router";
-import { LayoutGrid, Receipt, HandCoins, UserRound, ChartNoAxesCombined } from "lucide-react-native";
+import {
+  LayoutGrid,
+  Receipt,
+  HandCoins,
+  UserRound,
+  ChartNoAxesCombined,
+} from "lucide-react-native";
 
 type BottomDockProps = {
   avatar?: string | null;
@@ -38,9 +45,19 @@ const tabs = [
 
 export function BottomDock({ avatar }: BottomDockProps) {
   const insets = useSafeAreaInsets();
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   const pathname = usePathname();
   const { colors } = usePreferences();
 
+  if (keyboardVisible) return null;
   return (
     <View
       className="border-t border-app-border bg-app-card px-2 pt-3"
@@ -56,6 +73,9 @@ export function BottomDock({ avatar }: BottomDockProps) {
           return (
             <Pressable
               key={tab.href}
+              accessibilityRole="tab"
+              accessibilityLabel={tab.label}
+              accessibilityState={{ selected: isActive }}
               onPress={() => router.push(tab.href as never)}
               className="flex-1 items-center justify-center"
               style={({ pressed }) => ({
@@ -83,11 +103,14 @@ export function BottomDock({ avatar }: BottomDockProps) {
 
               {/* Label */}
               <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
                 className={`mt-1 text-[12px] ${
                   isActive ? "font-medium text-app-text" : "text-app-subtle"
                 }`}
               >
-                {tab.label}
+                {tab.label === "Transactions" ? "History" : tab.label}
               </Text>
             </Pressable>
           );

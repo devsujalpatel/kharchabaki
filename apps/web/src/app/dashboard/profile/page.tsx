@@ -1,223 +1,186 @@
 "use client";
-import { useOfflineStatus } from "@/components/providers/session-provider";
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAppSession } from "@/components/providers/session-provider";
+import { Check, Loader2, Mail, Pencil, Wallet } from "lucide-react";
+import {
+  useAppSession,
+  useOfflineStatus,
+} from "@/components/providers/session-provider";
+import { usePreferences } from "@/components/providers/preferences-provider";
 import { addBalance, balanceQuery } from "@/server/balance";
-
+import { AppLoading } from "@/components/app-loading";
 import { PreferencesSettings } from "@/components/preferences-settings";
 import { SyncStatus } from "@/components/sync-status";
-import { usePreferences } from "@/components/providers/preferences-provider";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 
 export default function ProfileDashboard() {
   const queryClient = useQueryClient();
   const offline = useOfflineStatus();
   const { formatMoney } = usePreferences();
-
   const { data: session, isPending: isSessionLoading } = useAppSession();
-
-  const {
-    data: balanceData,
-    isPending: isBalanceLoading,
-    error: balanceError,
-  } = useQuery({
-    queryKey: ["balance"],
-    queryFn: balanceQuery,
-  });
-
+  const balance = useQuery({ queryKey: ["balance"], queryFn: balanceQuery });
+  const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState("");
-
-  const { mutate: updateBalance, isPending: isUpdatingBalance } = useMutation({
-    mutationFn: (amount: number) => addBalance(amount),
-
+  const mutation = useMutation({
+    mutationFn: (value: number) => addBalance(value),
     onSuccess: () => {
       setAmount("");
-
-      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
-      queryClient.invalidateQueries({
-        queryKey: ["balance"],
-      });
+      setEditing(false);
+      void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      void queryClient.invalidateQueries({ queryKey: ["balance"] });
     },
   });
-
-  if (isSessionLoading || isBalanceLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading profile...</p>
-      </div>
-    );
-  }
-
-  if (!session) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p>You are not authenticated.</p>
-      </div>
-    );
-  }
-
+  if (isSessionLoading || balance.isPending) return <AppLoading compact />;
+  if (!session) return null;
   const user = session.user;
-
-  const handleBalanceSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    const value = Number(amount);
-
-    if (!amount.trim() || !Number.isFinite(value) || value < 0) {
-      return;
-    }
-
-    updateBalance(value);
-  };
-
+  const canWrite = offline.online && !offline.pending;
+  const formattedBalance = formatMoney(balance.data?.data.balance ?? 0);
   return (
-    <main className="mx-auto w-full max-w-4xl p-2 sm:p-6">
-      <div className="mb-8">
+    <div className="mx-auto max-w-4xl space-y-5 pb-24">
+      <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
-
-        <p className="text-sm text-muted-foreground">
-          Manage your profile and account balance.
-        </p>
-      </div>
-
-      <div className="mb-6">
         <SyncStatus />
       </div>
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Profile */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Personal information</CardTitle>
-            <CardDescription>
-              Your account information from authentication.
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-6">
-            <div className="flex items-center gap-4">
-              <Avatar className="size-16">
-                <AvatarImage src={user?.image ?? undefined} alt={user.name} />
-
-                <AvatarFallback>
-                  {user.name
-                    ?.split(" ")
-                    .map((name) => name[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-
-              <div>
-                <h2 className="font-medium">{user.name}</h2>
-
-                <p className="text-sm text-muted-foreground">{user.email}</p>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Name</p>
-
-                <p className="font-medium">{user.name}</p>
-              </div>
-
-              <div>
-                <p className="text-sm text-muted-foreground">Email</p>
-
-                <p className="font-medium">{user.email}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {(!offline.online || offline.pending > 0) && (
-          <p className="mt-4 text-xs text-muted-foreground">
+      <section
+        aria-label="Your account"
+        className="flex items-center gap-4 overflow-hidden rounded-2xl border bg-card p-5"
+      >
+        <Avatar className="size-16 shrink-0 rounded-2xl">
+          <AvatarImage src={user.image ?? undefined} alt={user.name} />
+          <AvatarFallback className="rounded-2xl bg-primary/10 text-lg font-semibold text-primary">
+            {user.name
+              .split(" ")
+              .map((name) => name[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0">
+          <h2 className="truncate text-lg font-semibold" title={user.name}>
+            {user.name}
+          </h2>
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Mail className="size-3.5 shrink-0" />
+            <span className="truncate" title={user.email}>
+              {user.email}
+            </span>
+          </p>
+        </div>
+      </section>
+      <section
+        aria-label="Account balance"
+        className="rounded-2xl border border-primary/20 bg-primary/5 p-5"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Wallet className="size-4" />
+              Current balance
+            </p>
+            {balance.error ? (
+              <p role="alert" className="mt-2 text-sm text-destructive">
+                {balance.error.message}
+              </p>
+            ) : (
+              <p
+                className="mt-2 truncate text-3xl font-semibold tracking-tight tabular-nums"
+                title={formattedBalance}
+              >
+                {formattedBalance}
+              </p>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-11 shrink-0 rounded-2xl border-primary/20 bg-card/60 text-primary"
+            disabled={!canWrite}
+            aria-label="Edit opening balance"
+            title="Edit opening balance"
+            aria-haspopup="dialog"
+            onClick={() => {
+              mutation.reset();
+              setEditing(true);
+            }}
+          >
+            <Pencil className="size-4" />
+          </Button>
+        </div>
+        {!canWrite && (
+          <p className="mt-3 text-xs text-muted-foreground">
             Connect and finish syncing to change your opening balance.
           </p>
         )}
-        {/* Balance */}
-        <Card className="mb-15 sm:mb-0">
-          <CardHeader>
-            <CardTitle>Balance</CardTitle>
-
-            <CardDescription>
-              Set the amount you already have before tracking transactions.
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-6">
-            <div>
-              <p className="text-sm text-muted-foreground">Current balance</p>
-
-              {balanceError ? (
-                <p className="mt-1 text-sm text-destructive">
-                  Failed to load balance.
-                </p>
-              ) : (
-                <p className="mt-1 text-3xl font-semibold tracking-tight">
-                  {formatMoney(balanceData?.data.balance ?? 0)}
-                </p>
-              )}
-            </div>
-
-            <Separator />
-
-            <form onSubmit={handleBalanceSubmit} className="space-y-3">
-              <div>
-                <label htmlFor="balance" className="text-sm font-medium">
-                  Opening balance
-                </label>
-
-                <p className="mb-2 text-xs text-muted-foreground">
-                  This will replace your current opening balance.
-                </p>
-
-                <Input
-                  id="balance"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="25000"
-                  value={amount}
-                  disabled={isUpdatingBalance}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </div>
-
-              <Button
-                type="submit"
-                disabled={
-                  !offline.online ||
-                  offline.pending > 0 ||
-                  isUpdatingBalance ||
-                  !amount ||
-                  Number(amount) < 0
-                }
-                className="w-full"
-                variant={"primary"}
-              >
-                {isUpdatingBalance ? "Updating..." : "Update balance"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+      </section>
       <PreferencesSettings />
-    </main>
+      {editing && (
+        <FormDialog
+          title="Opening balance"
+          icon={Wallet}
+          onClose={() => setEditing(false)}
+          busy={mutation.isPending}
+        >
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const value = Number(amount);
+              if (
+                !amount.trim() ||
+                !Number.isFinite(value) ||
+                value < 0 ||
+                !canWrite
+              )
+                return;
+              mutation.mutate(value);
+            }}
+          >
+            <label className="block space-y-2">
+              <span className="text-sm font-medium">Amount</span>
+              <Input
+                type="number"
+                min="0"
+                max="999999999999.99"
+                step="0.01"
+                inputMode="decimal"
+                required
+                disabled={mutation.isPending}
+                placeholder="0.00"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                className="h-14 rounded-2xl text-2xl font-semibold md:text-2xl"
+              />
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Replaces the balance you started tracking with.
+            </p>
+            {mutation.error && (
+              <p role="alert" className="text-sm text-destructive">
+                {mutation.error.message}
+              </p>
+            )}
+            <Button
+              type="submit"
+              disabled={
+                !canWrite || mutation.isPending || !amount || Number(amount) < 0
+              }
+              className="h-12 w-full rounded-xl font-semibold"
+            >
+              {mutation.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Check className="size-4" />
+              )}
+              Save balance
+            </Button>
+          </form>
+        </FormDialog>
+      )}
+    </div>
   );
 }

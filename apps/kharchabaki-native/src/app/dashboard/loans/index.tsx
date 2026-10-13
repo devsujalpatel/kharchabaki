@@ -1,361 +1,329 @@
-import { useOfflineStatus } from "@/lib/session-provider";
-import { usePreferences } from "@/lib/preferences";
-import { type JSX, useState } from "react";
+import { type JSX, type ReactNode, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { ArrowDownLeft, ArrowUpRight, HandCoins } from "lucide-react-native";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  HandCoins,
+  Plus,
+} from "lucide-react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DateTimePicker from "@react-native-community/datetimepicker";
-
+import { FormSheet } from "@/components/FormSheet";
+import { useOfflineStatus } from "@/lib/session-provider";
+import { usePreferences } from "@/lib/preferences";
 import {
-  ApiResponse,
   createGivenLoan,
   createTakenLoan,
   getGivenLoans,
   getTakenLoans,
   recordGivenLoanPayment,
   recordTakenLoanPayment,
+  type ApiResponse,
   type GivenLoan,
   type TakenLoan,
 } from "@/lib/loan";
 
 type LoanKind = "taken" | "given";
-
-const initialForm = {
-  amount: "",
-  person: "",
-  dueDate: "",
-  interest: "0.00",
-};
+const initialForm = { amount: "", person: "", interest: "0" };
 
 export default function Loans(): JSX.Element {
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [dueDate, setDueDate] = useState(new Date());
   const queryClient = useQueryClient();
   const offline = useOfflineStatus();
   const { colors, formatMoney } = usePreferences();
-
   const [kind, setKind] = useState<LoanKind>("taken");
+  const [createKind, setCreateKind] = useState<LoanKind>("taken");
+  const [showForm, setShowForm] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dueDate, setDueDate] = useState(new Date());
   const [form, setForm] = useState(initialForm);
-
-  const takenLoansQuery = useQuery({
-    queryKey: ["loans", "taken"],
-    queryFn: getTakenLoans,
-  });
-
-  const givenLoansQuery = useQuery({
-    queryKey: ["loans", "given"],
-    queryFn: getGivenLoans,
-  });
+  const [formError, setFormError] = useState("");
+  const takenQuery = useQuery({ queryKey: ["loans", "taken"], queryFn: getTakenLoans });
+  const givenQuery = useQuery({ queryKey: ["loans", "given"], queryFn: getGivenLoans });
 
   const refreshLoans = () => {
-    queryClient.invalidateQueries({
-      queryKey: ["loans"],
-    });
-
-    queryClient.invalidateQueries({
-      queryKey: ["balance"],
-    });
-
-    queryClient.invalidateQueries({
-      queryKey: ["dashboard-summary"],
-    });
+    void queryClient.invalidateQueries({ queryKey: ["loans"] });
+    void queryClient.invalidateQueries({ queryKey: ["balance"] });
+    void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
   };
-
   const createMutation = useMutation<ApiResponse<TakenLoan> | ApiResponse<GivenLoan>, Error>({
     mutationFn: () => {
-      if (kind === "taken") {
-        return createTakenLoan({
-          amount: form.amount,
-          borrowedFrom: form.person,
-          dueDate: form.dueDate,
-          interest: form.interest,
-        });
-      }
-
-      return createGivenLoan({
-        amount: form.amount,
-        borrowerName: form.person,
-        dueDate: form.dueDate,
-        interest: form.interest,
-      });
+      const values = {
+        amount: form.amount.trim(),
+        dueDate: formatDateForApi(dueDate),
+        interest: form.interest.trim(),
+      };
+      return createKind === "taken"
+        ? createTakenLoan({ ...values, borrowedFrom: form.person.trim() })
+        : createGivenLoan({ ...values, borrowerName: form.person.trim() });
     },
-
     onSuccess: () => {
+      setShowForm(false);
       setForm(initialForm);
+      setKind(createKind);
       refreshLoans();
     },
   });
+  const selectedQuery = kind === "taken" ? takenQuery : givenQuery;
+  const loans = selectedQuery.data?.data ?? [];
+  const outstanding = loans.reduce(
+    (sum, loan) => sum + Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount)),
+    0
+  );
+  const canChange = offline.online && offline.pending === 0;
+  const accent = kind === "taken" ? "#d97706" : "#059669";
 
-  const takenLoans = takenLoansQuery.data?.data ?? [];
-  const givenLoans = givenLoansQuery.data?.data ?? [];
-
-  const isLoading = takenLoansQuery.isPending || givenLoansQuery.isPending;
-
-  const hasError = takenLoansQuery.isError || givenLoansQuery.isError;
-
+  const openForm = () => {
+    setCreateKind(kind);
+    setForm(initialForm);
+    setDueDate(new Date());
+    setFormError("");
+    setShowDatePicker(false);
+    createMutation.reset();
+    setShowForm(true);
+  };
   const submitLoan = () => {
-    if (!form.amount || !form.person || !form.dueDate || !form.interest) {
+    if (!canChange || createMutation.isPending) return;
+    if (!Number.isFinite(Number(form.amount)) || Number(form.amount) <= 0) {
+      setFormError("Enter an amount greater than zero.");
       return;
     }
-
+    if (!form.person.trim()) {
+      setFormError("Enter a person or bank name.");
+      return;
+    }
+    if (
+      !form.interest.trim() ||
+      !Number.isFinite(Number(form.interest)) ||
+      Number(form.interest) < 0
+    ) {
+      setFormError("Interest must be zero or greater.");
+      return;
+    }
+    setFormError("");
     createMutation.mutate();
   };
 
   return (
     <View className="flex-1 bg-app-bg">
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerClassName="px-5 pb-8 pt-6"
-      >
-        {/* Header */}
-
-        <View className="mb-7">
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="px-5 pb-8 pt-6">
+        <View className="mb-6 flex-row items-center justify-between">
           <Text className="text-3xl font-semibold tracking-tight text-app-text">Loans</Text>
-
-          <Text className="mt-1 text-sm text-app-subtle">
-            Track money you borrow and lend, including repayments.
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Add ${kind === "taken" ? "borrowed" : "lent"} loan`}
+            disabled={!canChange}
+            onPress={openForm}
+            className={`h-12 w-12 items-center justify-center rounded-2xl bg-app-primary ${!canChange ? "opacity-40" : ""}`}
+          >
+            <Plus size={23} color={colors.onPrimary} />
+          </Pressable>
+        </View>
+        <LoanTabs kind={kind} onChange={setKind} />
+        <View className="my-5 rounded-[22px] border border-app-border bg-app-card p-5">
+          <View className="flex-row items-center gap-2">
+            {kind === "taken" ? (
+              <ArrowDownLeft size={18} color={accent} />
+            ) : (
+              <ArrowUpRight size={18} color={accent} />
+            )}
+            <Text className="flex-1 text-sm text-app-subtle">
+              {kind === "taken" ? "To repay" : "To collect"}
+            </Text>
+            {!selectedQuery.isPending && !selectedQuery.isError && (
+              <Text className="text-xs text-app-subtle">
+                {loans.length} {loans.length === 1 ? "loan" : "loans"}
+              </Text>
+            )}
+          </View>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            className="mt-3 text-3xl font-semibold tracking-tight text-app-text"
+          >
+            {selectedQuery.isPending || selectedQuery.isError ? "—" : formatMoney(outstanding)}
           </Text>
         </View>
-
-        {!isLoading && !hasError && (
-          <View className="mb-5 flex-row gap-3">
-            <View className="flex-1 rounded-2xl border border-app-border bg-amber-500/10 p-4">
-              <Text className="text-xs text-app-subtle">Still to repay</Text>
-              <Text numberOfLines={1} adjustsFontSizeToFit className="mt-1 text-lg font-semibold text-app-text">
-                {formatMoney(takenLoans.reduce((sum, loan) => sum + Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount)), 0))}
-              </Text>
-            </View>
-            <View className="flex-1 rounded-2xl border border-app-border bg-emerald-500/10 p-4">
-              <Text className="text-xs text-app-subtle">Still owed to you</Text>
-              <Text numberOfLines={1} adjustsFontSizeToFit className="mt-1 text-lg font-semibold text-app-text">
-                {formatMoney(givenLoans.reduce((sum, loan) => sum + Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount)), 0))}
-              </Text>
-            </View>
+        {!canChange && (
+          <Text className="mb-4 text-xs text-app-subtle">
+            Connect and finish syncing to add loans or payments.
+          </Text>
+        )}
+        {selectedQuery.isError ? (
+          <View className="items-center rounded-[22px] border border-app-border bg-app-card p-6">
+            <Text className="text-sm text-red-400">Could not load loans.</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void selectedQuery.refetch()}
+              className="mt-3 rounded-xl bg-app-muted px-5 py-3"
+            >
+              <Text className="text-sm font-medium text-app-text">Retry</Text>
+            </Pressable>
+          </View>
+        ) : selectedQuery.isPending ? (
+          <View
+            accessibilityLabel="Loading loans"
+            className="rounded-[22px] border border-app-border bg-app-card py-12"
+          >
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : loans.length === 0 ? (
+          <View className="items-center rounded-[22px] border border-app-border bg-app-card px-6 py-12">
+            <HandCoins size={32} color={colors.subtle} />
+            <Text className="mt-3 text-sm text-app-subtle">
+              No {kind === "taken" ? "borrowed" : "lent"} loans yet
+            </Text>
+          </View>
+        ) : (
+          <View className="gap-3">
+            {loans.map((loan) => (
+              <LoanRow key={loan.id} kind={kind} loan={loan} onRefresh={refreshLoans} />
+            ))}
           </View>
         )}
-
-        {/* Add Loan */}
-
-        <View className="rounded-[22px] border border-app-border bg-app-card p-5">
-          <Text className="text-lg font-medium text-app-text">Add a loan</Text>
-
-          {/* Loan type */}
-
-          <View className="mt-5 flex-row rounded-xl bg-app-muted p-1">
-            <Pressable
-              onPress={() => setKind("taken")}
-              className={`flex-1 items-center rounded-lg py-3 ${
-                kind === "taken" ? "bg-app-muted" : ""
-              }`}
-            >
-              <Text className={kind === "taken" ? "font-medium text-app-text" : "text-app-subtle"}>
-                I borrowed
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setKind("given")}
-              className={`flex-1 items-center rounded-lg py-3 ${
-                kind === "given" ? "bg-app-muted" : ""
-              }`}
-            >
-              <Text className={kind === "given" ? "font-medium text-app-text" : "text-app-subtle"}>
-                I lent
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* Amount */}
-
-          <LoanField label="Amount">
-            <TextInput
-              value={form.amount}
-              onChangeText={(value) =>
-                setForm({
-                  ...form,
-                  amount: value,
-                })
-              }
-              keyboardType="decimal-pad"
-              placeholder="5000"
-              placeholderTextColor="#52525b"
-              className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
-            />
-          </LoanField>
-
-          {/* Person */}
-
-          <LoanField label={kind === "taken" ? "Borrowed from" : "Borrower name"}>
-            <TextInput
-              value={form.person}
-              onChangeText={(value) =>
-                setForm({
-                  ...form,
-                  person: value,
-                })
-              }
-              placeholder={kind === "taken" ? "Bank or person" : "Person's name"}
-              placeholderTextColor="#52525b"
-              maxLength={100}
-              className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
-            />
-          </LoanField>
-
-          {/* Due date */}
-
-          <LoanField label="Due date">
-            <Pressable
-              onPress={() => setShowDatePicker(true)}
-              className="h-12 flex-row items-center justify-between rounded-xl border border-app-border bg-app-bg px-4"
-            >
-              <Text className="text-app-text">{formatDateForInput(dueDate)}</Text>
-
-              <Text className="text-app-subtle">Select</Text>
-            </Pressable>
-
-            {showDatePicker && (
-              <DateTimePicker
-                value={dueDate}
-                mode="date"
-                display="default"
-                minimumDate={new Date()}
-                onValueChange={(event, selectedDate) => {
-                  setShowDatePicker(false);
-
-                  if (!selectedDate) {
-                    return;
-                  }
-
-                  setDueDate(selectedDate);
-
-                  setForm({
-                    ...form,
-                    dueDate: formatDateForApi(selectedDate),
-                  });
-                }}
-              />
-            )}
-          </LoanField>
-          {/* Interest */}
-
-          <LoanField label="Interest (%)">
-            <TextInput
-              value={form.interest}
-              onChangeText={(value) =>
-                setForm({
-                  ...form,
-                  interest: value,
-                })
-              }
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-              placeholderTextColor="#52525b"
-              className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
-            />
-          </LoanField>
-
-          {/* Submit */}
-
+      </ScrollView>
+      <FormSheet
+        visible={showForm}
+        title="Add loan"
+        onClose={() => {
+          setShowForm(false);
+          setShowDatePicker(false);
+        }}
+        disabled={createMutation.isPending}
+        footer={
           <Pressable
-            disabled={!offline.online || offline.pending > 0 || createMutation.isPending}
+            accessibilityRole="button"
+            disabled={!canChange || createMutation.isPending}
             onPress={submitLoan}
-            className={`mt-5 h-12 items-center justify-center rounded-xl ${
-              createMutation.isPending ? "bg-app-muted" : "bg-app-primary"
-            }`}
+            className={`h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-app-primary ${!canChange || createMutation.isPending ? "opacity-50" : ""}`}
           >
             {createMutation.isPending ? (
               <ActivityIndicator color={colors.onPrimary} />
             ) : (
-              <Text className="font-semibold text-app-on-primary">
-                Add {kind === "taken" ? "borrowed" : "given"} loan
-              </Text>
+              <Check size={19} color={colors.onPrimary} />
             )}
+            <Text className="font-semibold text-app-on-primary">Save loan</Text>
           </Pressable>
-
-          {createMutation.isError && (
-            <Text className="mt-3 text-sm text-red-400">
-              Unable to create the loan. Please check the details and try again.
-            </Text>
-          )}
+        }
+      >
+        <LoanTabs kind={createKind} onChange={setCreateKind} disabled={createMutation.isPending} />
+        <LoanField label="Amount">
+          <TextInput
+            accessibilityLabel="Loan amount"
+            value={form.amount}
+            onChangeText={(amount) => setForm({ ...form, amount })}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            placeholderTextColor={colors.subtle}
+            editable={!createMutation.isPending}
+            className="h-14 rounded-2xl border border-app-border bg-app-bg px-4 text-xl font-semibold text-app-text"
+          />
+        </LoanField>
+        <LoanField label={createKind === "taken" ? "Borrowed from" : "Lent to"}>
+          <TextInput
+            accessibilityLabel={createKind === "taken" ? "Borrowed from" : "Lent to"}
+            value={form.person}
+            onChangeText={(person) => setForm({ ...form, person })}
+            placeholder="Person or bank"
+            placeholderTextColor={colors.subtle}
+            editable={!createMutation.isPending}
+            maxLength={100}
+            className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
+          />
+        </LoanField>
+        <View className="flex-row gap-3">
+          <View className="min-w-0 flex-1">
+            <LoanField label="Due date">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Choose loan due date"
+                disabled={createMutation.isPending}
+                onPress={() => setShowDatePicker(true)}
+                className="h-12 flex-row items-center gap-2 rounded-xl border border-app-border bg-app-bg px-3"
+              >
+                <CalendarDays size={17} color={colors.subtle} />
+                <Text numberOfLines={1} className="flex-1 text-sm text-app-text">
+                  {formatDateForInput(dueDate)}
+                </Text>
+              </Pressable>
+            </LoanField>
+          </View>
+          <View className="w-28">
+            <LoanField label="Interest (%)">
+              <TextInput
+                accessibilityLabel="Interest percentage"
+                value={form.interest}
+                onChangeText={(interest) => setForm({ ...form, interest })}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor={colors.subtle}
+                editable={!createMutation.isPending}
+                className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
+              />
+            </LoanField>
+          </View>
         </View>
-
-        {/* Loan lists */}
-
-        <View className="mt-6">
-          {hasError ? (
-            <View className="rounded-[22px] border border-app-border bg-app-card px-5 py-12">
-              <Text className="text-center text-sm text-red-400">Failed to load loans.</Text>
-            </View>
-          ) : isLoading ? (
-            <View className="rounded-[22px] border border-app-border bg-app-card py-12">
-              <ActivityIndicator color="#ffffff" />
-
-              <Text className="mt-3 text-center text-sm text-app-subtle">Loading loans...</Text>
-            </View>
-          ) : (
-            <>
-              <LoanList kind="taken" loans={takenLoans} onRefresh={refreshLoans} />
-
-              <LoanList kind="given" loans={givenLoans} onRefresh={refreshLoans} />
-            </>
-          )}
-        </View>
-      </ScrollView>
+        {showDatePicker && (
+          <DateTimePicker
+            value={dueDate}
+            mode="date"
+            display="default"
+            minimumDate={new Date()}
+            onValueChange={(_event, selectedDate) => {
+              setShowDatePicker(false);
+              if (selectedDate) setDueDate(selectedDate);
+            }}
+          />
+        )}
+        {(formError || createMutation.isError) && (
+          <Text accessibilityRole="alert" className="mt-4 text-sm text-red-400">
+            {formError || createMutation.error?.message}
+          </Text>
+        )}
+      </FormSheet>
     </View>
   );
 }
 
-function LoanList({
+function LoanTabs({
   kind,
-  loans,
-  onRefresh,
+  onChange,
+  disabled = false,
 }: {
   kind: LoanKind;
-  loans: TakenLoan[] | GivenLoan[];
-  onRefresh: () => void;
+  onChange: (kind: LoanKind) => void;
+  disabled?: boolean;
 }) {
-  const isTaken = kind === "taken";
-
+  const { colors } = usePreferences();
   return (
-    <View className="mb-5 overflow-hidden rounded-[22px] border border-app-border bg-app-card">
-      {/* Header */}
-
-      <View className="flex-row items-center border-b border-app-border p-5">
-        <View
-          className={`h-10 w-10 items-center justify-center rounded-xl ${
-            isTaken ? "bg-amber-500/10" : "bg-emerald-500/10"
-          }`}
-        >
-          {isTaken ? (
-            <ArrowDownLeft size={19} color="#f59e0b" />
-          ) : (
-            <ArrowUpRight size={19} color="#10b981" />
-          )}
-        </View>
-
-        <Text className="ml-3 text-base font-medium text-app-text">
-          {isTaken ? "Money borrowed" : "Money lent"}
-        </Text>
-      </View>
-
-      {/* Empty */}
-
-      {loans.length === 0 ? (
-        <View className="items-center justify-center px-6 py-12">
-          <HandCoins size={22} color="#52525b" />
-
-          <Text className="mt-3 text-sm text-app-subtle">
-            No {isTaken ? "borrowed" : "given"} loans yet.
-          </Text>
-        </View>
-      ) : (
-        <View>
-          {loans.map((loan) => (
-            <LoanRow key={loan.id} kind={kind} loan={loan} onRefresh={onRefresh} />
-          ))}
-        </View>
-      )}
+    <View accessibilityRole="tablist" className="flex-row gap-2 rounded-2xl bg-app-muted p-1.5">
+      {(["taken", "given"] as const).map((option) => {
+        const selected = kind === option;
+        const Icon = option === "taken" ? ArrowDownLeft : ArrowUpRight;
+        return (
+          <Pressable
+            key={option}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            disabled={disabled}
+            onPress={() => onChange(option)}
+            className={`h-12 flex-1 flex-row items-center justify-center gap-2 rounded-xl ${selected ? (option === "taken" ? "bg-amber-500" : "bg-emerald-500") : ""}`}
+          >
+            <Icon size={18} color={selected ? "#102018" : colors.subtle} />
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={selected ? { color: "#102018" } : undefined}
+              className={`text-sm font-semibold ${selected ? "" : "text-app-subtle"}`}
+            >
+              {option === "taken" ? "I borrowed" : "I lent"}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -371,183 +339,230 @@ function LoanRow({
 }) {
   const offline = useOfflineStatus();
   const { formatMoney, colors } = usePreferences();
+  const [showPayment, setShowPayment] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [amount, setAmount] = useState("");
-
-  const isTaken = kind === "taken";
-
-  const person = "borrowedFrom" in loan ? loan.borrowedFrom : loan.borrowerName;
-
-  const outstanding = Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount));
-  const paidProgress = Number(loan.totalAmount) > 0 ? Math.min(100, (Number(loan.paidAmount) / Number(loan.totalAmount)) * 100) : 0;
   const [paymentError, setPaymentError] = useState("");
-
+  const person = "borrowedFrom" in loan ? loan.borrowedFrom : loan.borrowerName;
+  const outstanding = Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount));
+  const paidProgress =
+    Number(loan.totalAmount) > 0
+      ? Math.min(100, (Number(loan.paidAmount) / Number(loan.totalAmount)) * 100)
+      : 0;
+  const paid = loan.status === "paid" || outstanding === 0;
+  const canChange = offline.online && offline.pending === 0;
+  const accent = kind === "taken" ? "#d97706" : "#059669";
   const paymentMutation = useMutation({
     mutationFn: () =>
-      isTaken
-        ? recordTakenLoanPayment({
-            loanId: loan.id,
-            amount,
-          })
-        : recordGivenLoanPayment({
-            loanId: loan.id,
-            amount,
-          }),
-
+      kind === "taken"
+        ? recordTakenLoanPayment({ loanId: loan.id, amount })
+        : recordGivenLoanPayment({ loanId: loan.id, amount }),
     onSuccess: () => {
       setAmount("");
+      setShowPayment(false);
       onRefresh();
     },
   });
-
   const submitPayment = () => {
+    if (!canChange || paymentMutation.isPending) return;
     const value = Number(amount);
-
     if (!Number.isFinite(value) || value <= 0) {
       setPaymentError("Enter an amount greater than zero.");
       return;
     }
-
     if (value > outstanding) {
       setPaymentError(`Payment cannot exceed ${formatMoney(outstanding)}.`);
       return;
     }
-
     setPaymentError("");
     paymentMutation.mutate();
   };
-
   return (
-    <View className="border-b border-app-border p-5">
-      {/* Top */}
-
-      <View className="flex-row items-start justify-between">
-        <View className="flex-1 pr-3">
-          <Text numberOfLines={1} className="text-base font-medium text-app-text">
-            {person}
-          </Text>
-
-          <Text className="mt-1 text-xs text-app-subtle">
-            Due {formatDate(loan.dueDate)} · {loan.interest}% interest
-          </Text>
-        </View>
-
-        {/* Status */}
-
+    <View className="overflow-hidden rounded-[22px] border border-app-border bg-app-card p-4">
+      <View className="flex-row items-center gap-3">
         <View
-          className={`rounded-full px-3 py-1 ${
-            loan.status === "paid"
-              ? "bg-emerald-500/10"
-              : loan.status === "overdue"
-                ? "bg-red-500/10"
-                : "bg-amber-500/10"
-          }`}
+          className={`h-11 w-11 items-center justify-center rounded-2xl ${kind === "taken" ? "bg-amber-500/10" : "bg-emerald-500/10"}`}
         >
-          <Text
-            className={`text-xs font-medium ${
-              loan.status === "paid"
-                ? "text-emerald-400"
-                : loan.status === "overdue"
-                  ? "text-red-400"
-                  : "text-amber-400"
-            }`}
-          >
-            {loan.status}
-          </Text>
-        </View>
-      </View>
-
-      {/* Amount */}
-
-      <View className="mt-5">
-        <Text className="text-xs text-app-subtle">Outstanding</Text>
-
-        <Text className="mt-1 text-xl font-semibold text-app-text">{formatMoney(outstanding)}</Text>
-
-        <Text className="mt-1 text-xs text-app-subtle">
-          Paid {formatMoney(Number(loan.paidAmount))} of {formatMoney(Number(loan.totalAmount))}
-        </Text>
-        <View accessibilityRole="progressbar" accessibilityLabel={`Loan repayment progress for ${person}`} accessibilityValue={{ min: 0, max: 100, now: Math.round(paidProgress) }} className="mt-2 h-2 overflow-hidden rounded-full bg-app-muted">
-          <View className="h-full rounded-full bg-app-primary" style={{ width: `${paidProgress}%` }} />
-        </View>
-      </View>
-
-      {/* Payment */}
-
-      {loan.status !== "paid" && (
-        <View className="mt-5">
-          <View className="flex-row items-end gap-2">
-            <View className="min-w-0 flex-1">
-              <Text className="mb-2 text-xs font-medium text-app-subtle">Payment amount</Text>
-              <TextInput
-                accessibilityLabel={`Payment amount for ${person}`}
-                value={amount}
-                onChangeText={(value) => { setAmount(value); setPaymentError(""); }}
-                keyboardType="decimal-pad"
-                placeholder="0.00"
-                placeholderTextColor="#52525b"
-                className="h-11 rounded-xl border border-app-border bg-app-bg px-3 text-base text-app-text"
-              />
-            </View>
-
-            <Pressable
-              disabled={
-                !offline.online || offline.pending > 0 || paymentMutation.isPending || !amount
-              }
-              onPress={submitPayment}
-              className={`ml-2 h-11 w-24 items-center justify-center rounded-xl ${
-                paymentMutation.isPending || !amount ? "bg-app-muted" : "bg-app-primary"
-              }`}
-            >
-              {paymentMutation.isPending ? (
-                <View className="flex-row items-center"><ActivityIndicator color={colors.onPrimary} /><Text className="ml-2 text-xs font-semibold text-app-on-primary">Recording…</Text></View>
-              ) : (
-                <Text className="text-center text-xs font-semibold text-app-on-primary">Record payment</Text>
-              )}
-            </Pressable>
-          </View>
-
-          {(paymentError || paymentMutation.isError) && (
-            <Text accessibilityRole="alert" className="mt-2 text-xs text-red-400">
-              {paymentError || paymentMutation.error?.message || "Unable to record payment."}
-            </Text>
+          {paid ? (
+            <Check size={20} color={accent} />
+          ) : kind === "taken" ? (
+            <ArrowDownLeft size={20} color={accent} />
+          ) : (
+            <ArrowUpRight size={20} color={accent} />
           )}
         </View>
+        <View className="min-w-0 flex-1">
+          <Text numberOfLines={1} className="text-base font-semibold text-app-text">
+            {person}
+          </Text>
+          <Text
+            numberOfLines={1}
+            className={`mt-1 text-xs ${loan.status === "overdue" && !paid ? "text-red-400" : "text-app-subtle"}`}
+          >
+            {paid
+              ? "Paid"
+              : `${loan.status === "overdue" ? "Overdue · " : "Due "}${formatDate(loan.dueDate)}`}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${expanded ? "Hide" : "Show"} loan details for ${person}`}
+          accessibilityState={{ expanded }}
+          onPress={() => setExpanded(!expanded)}
+          className="h-11 w-11 items-center justify-center rounded-xl bg-app-muted"
+        >
+          {expanded ? (
+            <ChevronUp size={18} color={colors.subtle} />
+          ) : (
+            <ChevronDown size={18} color={colors.subtle} />
+          )}
+        </Pressable>
+      </View>
+      <View className="mt-4 flex-row items-center gap-3">
+        <View className="min-w-0 flex-1">
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            className="text-2xl font-semibold tracking-tight text-app-text"
+          >
+            {formatMoney(outstanding)}
+          </Text>
+          <Text numberOfLines={1} className="mt-1 text-xs text-app-subtle">
+            {Math.round(paidProgress)}% repaid
+          </Text>
+        </View>
+        {!paid && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Record payment for ${person}`}
+            disabled={!canChange}
+            onPress={() => {
+              setPaymentError("");
+              setAmount("");
+              paymentMutation.reset();
+              setShowPayment(true);
+            }}
+            className={`h-12 w-12 items-center justify-center rounded-2xl bg-app-primary ${!canChange ? "opacity-40" : ""}`}
+          >
+            <HandCoins size={21} color={colors.onPrimary} />
+          </Pressable>
+        )}
+      </View>
+      <View
+        accessibilityRole="progressbar"
+        accessibilityLabel={`Repayment progress for ${person}`}
+        accessibilityValue={{ min: 0, max: 100, now: Math.round(paidProgress) }}
+        className="mt-3 h-1.5 overflow-hidden rounded-full bg-app-muted"
+      >
+        <View
+          className="h-full rounded-full"
+          style={{ width: `${paidProgress}%`, backgroundColor: accent }}
+        />
+      </View>
+      {expanded && (
+        <View className="mt-4 gap-2 border-t border-app-border pt-3">
+          <Detail label="Principal" value={formatMoney(loan.amount)} />
+          <Detail label="Interest" value={`${loan.interest}%`} />
+          <Detail
+            label="Paid"
+            value={`${formatMoney(loan.paidAmount)} / ${formatMoney(loan.totalAmount)}`}
+          />
+        </View>
       )}
+      <FormSheet
+        visible={showPayment}
+        title="Record payment"
+        onClose={() => setShowPayment(false)}
+        disabled={paymentMutation.isPending}
+        footer={
+          <Pressable
+            accessibilityRole="button"
+            disabled={!canChange || paymentMutation.isPending || !amount.trim()}
+            onPress={submitPayment}
+            className={`h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-app-primary ${!canChange || paymentMutation.isPending || !amount.trim() ? "opacity-50" : ""}`}
+          >
+            {paymentMutation.isPending ? (
+              <ActivityIndicator color={colors.onPrimary} />
+            ) : (
+              <Check size={19} color={colors.onPrimary} />
+            )}
+            <Text className="font-semibold text-app-on-primary">Save payment</Text>
+          </Pressable>
+        }
+      >
+        <Text numberOfLines={1} className="text-lg font-semibold text-app-text">
+          {person}
+        </Text>
+        <Text numberOfLines={1} className="mt-1 text-sm text-app-subtle">
+          {formatMoney(outstanding)} remaining
+        </Text>
+        <LoanField label="Amount">
+          <TextInput
+            accessibilityLabel={`Payment amount for ${person}`}
+            value={amount}
+            onChangeText={(value) => {
+              setAmount(value);
+              setPaymentError("");
+            }}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            placeholderTextColor={colors.subtle}
+            editable={!paymentMutation.isPending}
+            className="h-14 rounded-2xl border border-app-border bg-app-bg px-4 text-xl font-semibold text-app-text"
+          />
+        </LoanField>
+        <Pressable
+          accessibilityRole="button"
+          disabled={!canChange || paymentMutation.isPending}
+          onPress={() => {
+            setAmount(outstanding.toFixed(2));
+            setPaymentError("");
+          }}
+          className="mt-3 self-start rounded-xl bg-app-muted px-3 py-2"
+        >
+          <Text className="text-xs font-medium text-app-text">Full amount</Text>
+        </Pressable>
+        {(paymentError || paymentMutation.isError) && (
+          <Text accessibilityRole="alert" className="mt-4 text-sm text-red-400">
+            {paymentError || paymentMutation.error?.message || "Unable to record payment."}
+          </Text>
+        )}
+      </FormSheet>
     </View>
   );
 }
-
-function LoanField({ label, children }: { label: string; children: React.ReactNode }) {
+function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <View className="mt-4">
-      <Text className="mb-2 text-sm font-medium text-app-text">{label}</Text>
-
+    <View className="flex-row items-center gap-3">
+      <Text className="text-xs text-app-subtle">{label}</Text>
+      <Text
+        numberOfLines={1}
+        className="min-w-0 flex-1 text-right text-xs font-medium text-app-text"
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+function LoanField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View className="mt-5">
+      <Text className="mb-2 text-xs font-medium text-app-subtle">{label}</Text>
       {children}
     </View>
   );
 }
-
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-IN", {
+  return new Intl.DateTimeFormat("en", {
     day: "numeric",
     month: "short",
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(value));
 }
-
 function formatDateForInput(date: Date) {
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return new Intl.DateTimeFormat("en", { day: "numeric", month: "short" }).format(date);
 }
-
 function formatDateForApi(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }

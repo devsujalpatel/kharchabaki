@@ -1,90 +1,225 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { Check, ChevronRight, Coins, Palette, RotateCw, Search } from "lucide-react-native";
 import { currencies, currencyLabel, themes, palettes, formatLabel } from "@/lib/finance";
 import { usePreferences } from "@/lib/preferences";
+import { FormSheet } from "@/components/FormSheet";
+
 export function PreferencesSettings() {
   const { currency, theme, colors, save, saving, loading, error, retry } = usePreferences();
+  const [selector, setSelector] = useState<"currency" | "theme" | null>(null);
   const [search, setSearch] = useState("");
   const options = currencies.filter((code) =>
-    currencyLabel(code).toLowerCase().includes(search.toLowerCase())
+    currencyLabel(code).toLowerCase().includes(search.trim().toLowerCase())
   );
   return (
-    <View className="mt-6 rounded-2xl border border-app-border bg-app-card p-5">
-      <Text className="text-lg font-semibold text-app-text">Preferences</Text>
-      {loading ? (
-        <ActivityIndicator color={colors.primary} />
-      ) : (
-        <>
-          <Text className="mb-2 mt-4 font-medium text-app-text">
-            Default currency · {currencyLabel(currency)}
+    <View className="mt-5 overflow-hidden rounded-[22px] border border-app-border bg-app-card">
+      <View className="flex-row items-center justify-between px-5 pb-2 pt-5">
+        <Text className="text-base font-semibold text-app-text">Preferences</Text>
+        {(saving || loading) && (
+          <ActivityIndicator
+            accessibilityLabel={saving ? "Saving preferences" : "Loading preferences"}
+            size="small"
+            color={colors.primary}
+          />
+        )}
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Currency: ${currencyLabel(currency)}. Change currency`}
+        disabled={saving || loading}
+        onPress={() => {
+          setSearch("");
+          setSelector("currency");
+        }}
+        className="flex-row items-center gap-3 px-5 py-4"
+      >
+        <View className="h-10 w-10 items-center justify-center rounded-xl bg-app-muted">
+          <Coins size={19} color={colors.primary} />
+        </View>
+        <Text className="flex-1 text-sm font-medium text-app-text">Currency</Text>
+        <Text numberOfLines={1} className="max-w-[40%] text-sm text-app-subtle">
+          {currencyLabel(currency)}
+        </Text>
+        <ChevronRight size={17} color={colors.subtle} />
+      </Pressable>
+      <View className="mx-5 h-px bg-app-border" />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Theme: ${formatLabel(theme)}. Change theme`}
+        disabled={saving || loading}
+        onPress={() => setSelector("theme")}
+        className="flex-row items-center gap-3 px-5 py-4"
+      >
+        <View className="h-10 w-10 items-center justify-center rounded-xl bg-app-muted">
+          <Palette size={19} color={colors.primary} />
+        </View>
+        <Text className="flex-1 text-sm font-medium text-app-text">Theme</Text>
+        <View
+          style={{
+            width: 16,
+            height: 16,
+            borderRadius: 8,
+            backgroundColor: colors.background,
+            borderColor: colors.primary,
+            borderWidth: 3,
+          }}
+        />
+        <Text numberOfLines={1} className="max-w-[35%] text-sm text-app-subtle">
+          {formatLabel(theme)}
+        </Text>
+        <ChevronRight size={17} color={colors.subtle} />
+      </Pressable>
+      {error && (
+        <View className="flex-row items-center gap-3 border-t border-app-border px-5 py-3">
+          <Text accessibilityRole="alert" className="flex-1 text-xs leading-5 text-red-400">
+            {error.message}
           </Text>
-          <Text className="mb-3 text-xs text-app-subtle">
-            Applies to all amounts. Changing currency does not convert existing values.
-          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Reload preferences"
+            onPress={() => void retry()}
+            className="h-11 w-11 items-center justify-center rounded-xl bg-app-muted"
+          >
+            <RotateCw size={17} color={colors.foreground} />
+          </Pressable>
+        </View>
+      )}
+      <FormSheet
+        visible={selector === "currency"}
+        title="Currency"
+        onClose={() => setSelector(null)}
+        disabled={saving}
+      >
+        <View className="mb-4 flex-row items-center gap-2 rounded-xl border border-app-border bg-app-bg px-3">
+          <Search size={18} color={colors.subtle} />
           <TextInput
             accessibilityLabel="Find currency"
             value={search}
             onChangeText={setSearch}
-            placeholder="Find currency (USD, GBP, JPY...)"
+            placeholder="Search currency"
             placeholderTextColor={colors.subtle}
-            className="mb-3 h-11 rounded-xl border border-app-border px-3 text-app-text"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            className="h-12 min-w-0 flex-1 text-app-text"
           />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View className="flex-row gap-2">
-              {options.map((code) => (
-                <Pressable
-                  key={code}
-                  disabled={saving}
-                  onPress={() => save({ currency: code })}
-                  className={`rounded-xl border p-3 ${currency === code ? "border-app-primary bg-app-primary" : "border-app-border"}`}
-                >
-                  <Text className={currency === code ? "text-app-on-primary" : "text-app-text"}>
-                    {currencyLabel(code)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </ScrollView>
-          <Text className="mb-3 mt-5 font-medium text-app-text">Theme</Text>
-          <View className="flex-row flex-wrap gap-3">
-            {themes.map((option) => (
+        </View>
+        <Text className="mb-4 text-xs leading-5 text-app-subtle">
+          Changes the symbol, without converting amounts.
+        </Text>
+        <View className="flex-row flex-wrap gap-2">
+          {options.map((code) => (
+            <Pressable
+              key={code}
+              accessibilityRole="radio"
+              accessibilityLabel={currencyLabel(code)}
+              accessibilityState={{ selected: currency === code }}
+              disabled={saving}
+              onPress={() => save({ currency: code }, { onSuccess: () => setSelector(null) })}
+              className={`min-h-12 w-[48%] flex-row items-center gap-2 rounded-xl border px-3 py-3 ${currency === code ? "border-app-primary bg-app-primary" : "border-app-border bg-app-bg"}`}
+            >
+              <Text
+                numberOfLines={1}
+                className={`min-w-0 flex-1 text-sm font-medium ${currency === code ? "text-app-on-primary" : "text-app-text"}`}
+              >
+                {currencyLabel(code)}
+              </Text>
+              {currency === code && <Check size={16} color={colors.onPrimary} />}
+            </Pressable>
+          ))}
+        </View>
+        {options.length === 0 && (
+          <Text className="py-5 text-center text-sm text-app-subtle">No currencies found</Text>
+        )}
+        {error && (
+          <Text accessibilityRole="alert" className="mt-4 text-sm text-red-400">
+            {error.message}
+          </Text>
+        )}
+      </FormSheet>
+      <FormSheet
+        visible={selector === "theme"}
+        title="Theme"
+        onClose={() => setSelector(null)}
+        disabled={saving}
+      >
+        <View className="flex-row flex-wrap gap-3">
+          {themes.map((option) => {
+            const p = palettes[option];
+            return (
               <Pressable
                 key={option}
-                disabled={saving}
-                onPress={() => save({ theme: option })}
+                accessibilityRole="radio"
+                accessibilityLabel={`${formatLabel(option)} theme`}
                 accessibilityState={{ selected: theme === option }}
-                className={`flex-row items-center gap-2 rounded-xl border p-3 ${theme === option ? "border-app-primary" : "border-app-border"}`}
+                disabled={saving}
+                onPress={() => save({ theme: option }, { onSuccess: () => setSelector(null) })}
+                className={`w-[47%] overflow-hidden rounded-2xl border p-3 ${theme === option ? "border-app-primary" : "border-app-border"}`}
               >
                 <View
                   style={{
-                    backgroundColor: palettes[option].background,
-                    borderColor: palettes[option].primary,
-                    borderWidth: 3,
-                    width: 24,
-                    height: 24,
-                    borderRadius: 12,
+                    backgroundColor: p.background,
+                    height: 76,
+                    borderRadius: 10,
+                    padding: 10,
                   }}
-                />
-                <Text className="text-app-text">
-                  {formatLabel(option)}
-                  {theme === option ? " ✓" : ""}
-                </Text>
+                >
+                  <View
+                    style={{
+                      backgroundColor: p.card,
+                      borderColor: p.border,
+                      borderWidth: 1,
+                      borderRadius: 7,
+                      padding: 8,
+                    }}
+                  >
+                    <View
+                      style={{
+                        backgroundColor: p.foreground,
+                        height: 4,
+                        width: "50%",
+                        borderRadius: 2,
+                      }}
+                    />
+                    <View
+                      style={{
+                        backgroundColor: p.muted,
+                        height: 4,
+                        width: "75%",
+                        borderRadius: 2,
+                        marginTop: 5,
+                      }}
+                    />
+                    <View
+                      style={{
+                        backgroundColor: p.primary,
+                        height: 10,
+                        width: "35%",
+                        borderRadius: 4,
+                        marginTop: 7,
+                      }}
+                    />
+                  </View>
+                </View>
+                <View className="mt-3 flex-row items-center justify-between gap-2">
+                  <Text
+                    numberOfLines={1}
+                    className="min-w-0 flex-1 text-sm font-medium text-app-text"
+                  >
+                    {formatLabel(option)}
+                  </Text>
+                  {theme === option && <Check size={17} color={colors.primary} />}
+                </View>
               </Pressable>
-            ))}
-          </View>
-        </>
-      )}
-      {saving && <Text className="mt-3 text-app-subtle">Saving preferences...</Text>}
-      {error && (
-        <View className="mt-3">
-          <Text accessibilityRole="alert" className="text-red-400">
+            );
+          })}
+        </View>
+        {error && (
+          <Text accessibilityRole="alert" className="mt-4 text-sm text-red-400">
             {error.message}
           </Text>
-          <Pressable onPress={() => retry()}>
-            <Text className="mt-2 text-app-text">Reload preferences</Text>
-          </Pressable>
-        </View>
-      )}
+        )}
+      </FormSheet>
     </View>
   );
 }
