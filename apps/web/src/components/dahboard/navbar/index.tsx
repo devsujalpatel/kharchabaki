@@ -9,6 +9,7 @@ import {
   User,
   LogOut,
   HandCoins,
+  ChartNoAxesCombined,
 } from "lucide-react";
 
 import { useAppSession } from "@/components/providers/session-provider";
@@ -35,6 +36,11 @@ const navigation = [
     label: "Transactions",
     href: "/dashboard/transactions",
     icon: Receipt,
+  },
+  {
+    label: "Analytics",
+    href: "/dashboard/analytics",
+    icon: ChartNoAxesCombined,
   },
   {
     label: "Loans",
@@ -225,7 +231,7 @@ export function Navbar() {
           sm:hidden
         "
       >
-        <div className="mx-auto grid h-16 max-w-md grid-cols-4 px-2">
+        <div className="mx-auto grid h-16 max-w-md grid-cols-5 px-2">
           {/* Home */}
           {navigation.map((item) => {
             const Icon = item.icon;

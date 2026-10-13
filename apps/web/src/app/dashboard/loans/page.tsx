@@ -33,6 +33,7 @@ const initialForm = {
 export default function LoansPage() {
   const queryClient = useQueryClient();
   const offline = useOfflineStatus();
+  const { formatMoney } = usePreferences();
   const [kind, setKind] = useState<LoanKind>("taken");
   const [form, setForm] = useState(initialForm);
 
@@ -84,12 +85,6 @@ export default function LoansPage() {
 
   return (
     <div className="space-y-6">
-      {(!offline.online || offline.pending > 0) && (
-        <p className="text-sm text-muted-foreground">
-          Your saved loans are available here. Connect and finish syncing to add
-          loans or payments.
-        </p>
-      )}
       <div className="sm:mt-10">
         <h1 className="text-2xl font-semibold tracking-tight">Loans</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -97,6 +92,26 @@ export default function LoansPage() {
         </p>
       </div>
 
+      {!isLoading && !hasError && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Card className="rounded-2xl border-amber-500/20 bg-amber-500/5">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Still to repay</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums">
+                {formatMoney(takenLoans.reduce((sum, loan) => sum + Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount)), 0))}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border-emerald-500/20 bg-emerald-500/5">
+            <CardContent className="p-4">
+              <p className="text-sm text-muted-foreground">Still owed to you</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums">
+                {formatMoney(givenLoans.reduce((sum, loan) => sum + Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount)), 0))}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="text-base">Add a loan</CardTitle>
@@ -295,7 +310,8 @@ function LoanRow({
   const [amount, setAmount] = useState("");
   const isTaken = kind === "taken";
   const person = "borrowedFrom" in loan ? loan.borrowedFrom : loan.borrowerName;
-  const outstanding = Number(loan.totalAmount) - Number(loan.paidAmount);
+  const outstanding = Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount));
+  const paidProgress = Number(loan.totalAmount) > 0 ? Math.min(100, (Number(loan.paidAmount) / Number(loan.totalAmount)) * 100) : 0;
   const paymentMutation = useMutation({
     mutationFn: () =>
       isTaken
@@ -320,7 +336,9 @@ function LoanRow({
           className={
             loan.status === "paid"
               ? "rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-700"
-              : "rounded-full bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700"
+              : loan.status === "overdue"
+                ? "rounded-full bg-red-500/10 px-2 py-1 text-xs font-medium text-red-700"
+                : "rounded-full bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700"
           }
         >
           {loan.status}
@@ -331,29 +349,37 @@ function LoanRow({
           <p className="text-xs text-muted-foreground">Outstanding</p>
           <p className="text-lg font-semibold">{formatMoney(outstanding)}</p>
           <p className="text-xs text-muted-foreground">
-            of {formatMoney(Number(loan.totalAmount))}
+            Paid {formatMoney(Number(loan.paidAmount))} of {formatMoney(Number(loan.totalAmount))}
           </p>
+          <div className="mt-2 h-2 w-40 max-w-full overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`Loan repayment progress for ${person}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(paidProgress)}>
+            <div className="h-full rounded-full bg-primary" style={{ width: `${paidProgress}%` }} />
+          </div>
         </div>
         {loan.status !== "paid" && (
           <form
-            className="flex items-center gap-2"
+            className="flex flex-wrap items-end gap-2"
             onSubmit={(event) => {
               event.preventDefault();
+              const value = Number(amount);
+              if (!Number.isFinite(value) || value <= 0 || value > outstanding) return;
               paymentMutation.mutate();
             }}
           >
-            <Input
-              aria-label="Payment amount"
-              type="number"
-              min="0.01"
-              max={outstanding}
-              step="0.01"
-              required
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              className="w-28"
-              placeholder="Payment"
-            />
+            <div className="space-y-2">
+              <Label htmlFor={`payment-${loan.id}`}>Payment amount</Label>
+              <Input
+                id={`payment-${loan.id}`}
+                type="number"
+                min="0.01"
+                max={outstanding}
+                step="0.01"
+                required
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                className="w-32"
+                placeholder="0.00"
+              />
+            </div>
             <Button
               type="submit"
               size="sm"
@@ -364,9 +390,9 @@ function LoanRow({
               }
             >
               {paymentMutation.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
+                <><Loader2 className="size-4 animate-spin" /> Recording…</>
               ) : (
-                "Record"
+                "Record payment"
               )}
             </Button>
           </form>
@@ -374,7 +400,7 @@ function LoanRow({
       </div>
       {paymentMutation.isError && (
         <p className="mt-2 text-xs text-destructive">
-          Unable to record payment.
+          {paymentMutation.error.message || "Unable to record payment."}
         </p>
       )}
     </div>

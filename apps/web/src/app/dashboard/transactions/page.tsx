@@ -165,11 +165,6 @@ export default function Transactions() {
                         transaction.source ?? transaction.category ?? "other",
                       )}
                   </p>
-                  {transaction.pending && (
-                    <span className="mt-1 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] text-primary">
-                      Saved on this device
-                    </span>
-                  )}
                   <p className="mt-1 text-xs text-muted-foreground">
                     {formatLabel(
                       transaction.source ?? transaction.category ?? "other",

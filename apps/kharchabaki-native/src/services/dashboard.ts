@@ -7,6 +7,8 @@ export type DashboardSummary = {
   month: string;
   daily: DailyTotal[];
   monthly: DailyTotal[];
+  expenseCategories: { category: string; total: string }[];
+  incomeSources: { source: string; total: string }[];
 };
 export type DashboardSummaryResponse = {
   success: boolean;

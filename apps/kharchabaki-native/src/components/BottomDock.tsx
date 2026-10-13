@@ -2,7 +2,7 @@ import { usePreferences } from "@/lib/preferences";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Pressable, Text, View, Image } from "react-native";
 import { usePathname, router } from "expo-router";
-import { LayoutGrid, Receipt, HandCoins, UserRound } from "lucide-react-native";
+import { LayoutGrid, Receipt, HandCoins, UserRound, ChartNoAxesCombined } from "lucide-react-native";
 
 type BottomDockProps = {
   avatar?: string | null;
@@ -18,6 +18,11 @@ const tabs = [
     label: "Transactions",
     href: "/dashboard/transactions",
     icon: Receipt,
+  },
+  {
+    label: "Analytics",
+    href: "/dashboard/analytics",
+    icon: ChartNoAxesCombined,
   },
   {
     label: "Loans",

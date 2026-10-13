@@ -255,6 +255,15 @@ test('summary fills leap-month days and six monthly buckets, using exact cents f
       { day: '2024-02-29', total: '0.20' },
     ],
     [{ day: '2024-02-15', total: '25.50' }],
+    [
+      { category: 'food', total: '20.00' },
+      { category: 'rent', total: '5.50' },
+    ],
+    [
+      { source: 'invesment', total: '0.20' },
+      { source: 'investment', total: '0.05' },
+      { source: 'salary', total: '0.10' },
+    ],
     [{ month: '2024-02', total: '0.30' }],
     [{ month: '2024-01', total: '10.00' }],
   ];
@@ -273,6 +282,16 @@ test('summary fills leap-month days and six monthly buckets, using exact cents f
   assert.equal(result.monthly[0].date, '2023-09');
   assert.equal(result.monthly[4].expense, '10.00');
   assert.equal(result.monthly[5].income, '0.30');
+  assert.deepEqual(result.expenseCategories, [
+    { category: 'food', total: '20.00' },
+    { category: 'rent', total: '5.50' },
+  ]);
+  assert.deepEqual(result.incomeSources, [
+    { source: 'investment', total: '0.25' },
+    { source: 'salary', total: '0.10' },
+  ]);
+  assert.deepEqual(calls[3].where.params, [owner, '2024-02-01T00:00:00.000Z', '2024-03-01T00:00:00.000Z']);
+  assert.deepEqual(calls[4].where.params, [owner, '2024-02-01T00:00:00.000Z', '2024-03-01T00:00:00.000Z']);
 });
 test('month ranges cross year boundaries and reject malformed month inputs', () => {
   const range = monthRange('2025-12');

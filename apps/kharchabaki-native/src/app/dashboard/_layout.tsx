@@ -3,7 +3,6 @@ import { useAppSession } from "@/lib/session-provider";
 import { AppLoading } from "@/components/AppLoading";
 import { View } from "react-native";
 import { PreferencesProvider, usePreferences } from "@/lib/preferences";
-import { SyncStatus } from "@/components/SyncStatus";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomDock } from "@/components/BottomDock";
 
@@ -23,7 +22,6 @@ function DashboardContent({ avatar }: { avatar?: string | null }) {
   const { colors } = usePreferences();
   return (
     <View className="flex-1 bg-app-bg" style={{ paddingTop: insets.top }}>
-      <SyncStatus />
       <Stack
         screenOptions={{
           headerShown: false,

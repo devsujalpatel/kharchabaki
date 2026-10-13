@@ -7,6 +7,7 @@ import { useAppSession } from "@/components/providers/session-provider";
 import { addBalance, balanceQuery } from "@/server/balance";
 
 import { PreferencesSettings } from "@/components/preferences-settings";
+import { SyncStatus } from "@/components/sync-status";
 import { usePreferences } from "@/components/providers/preferences-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,9 @@ export default function ProfileDashboard() {
         </p>
       </div>
 
+      <div className="mb-6">
+        <SyncStatus />
+      </div>
       <div className="grid gap-6 md:grid-cols-2">
         {/* Profile */}
         <Card>

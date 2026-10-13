@@ -149,6 +149,9 @@ function project(document: Document) {
     { records: document.records, delta: 0 },
   );
 }
+function canonicalSource(source: string) {
+  return source === "invesment" ? "investment" : source === "bonues" ? "bonus" : source;
+}
 function summary(month: string, records: SavedTransaction[], balance: number) {
   const [year, index] = month.split("-").map(Number);
   const days = new Date(Date.UTC(year, index, 0)).getUTCDate();
@@ -162,10 +165,34 @@ function summary(month: string, records: SavedTransaction[], balance: number) {
       ).toFixed(2);
     return { date, income: total("income"), expense: total("expense") };
   };
+  const selected = records.filter((row) => row.occurredAt.startsWith(month));
+  const groupTotal = (type: "income" | "expense", key: "source" | "category") => {
+    const totals = new Map<string, number>();
+    selected
+      .filter((row) => row.type === type)
+      .forEach((row) => {
+        const name = row[key] ?? "other";
+        totals.set(name, (totals.get(name) ?? 0) + toCents(row.amount));
+      });
+    return [...totals].map(([name, total]) => ({
+      ...(key === "source" ? { source: canonicalSource(name) } : { category: name }),
+      total: (total / 100).toFixed(2),
+    }));
+  };
+  const mergeSources = (values: { source?: string; total: string }[]) => {
+    const totals = new Map<string, number>();
+    values.forEach(({ source, total }) => {
+      const name = canonicalSource(source ?? "other");
+      totals.set(name, (totals.get(name) ?? 0) + toCents(total));
+    });
+    return [...totals].map(([source, total]) => ({ source, total: (total / 100).toFixed(2) }));
+  };
   return {
     balance: balance.toFixed(2),
     month,
     ...bucket(month),
+    expenseCategories: groupTotal("expense", "category"),
+    incomeSources: mergeSources(groupTotal("income", "source")),
     daily: Array.from({ length: days }, (_, day) =>
       bucket(`${month}-${String(day + 1).padStart(2, "0")}`),
     ),
@@ -393,6 +420,36 @@ export class OfflineClient {
               };
             })
           : values;
+      const changeGroups = (
+        values: unknown,
+        old: { category?: string; source?: string; total: string }[],
+        next: typeof old,
+        key: "category" | "source",
+      ) => {
+        if (!Array.isArray(values)) return values;
+        const canonical = (value: unknown) =>
+          key === "source" ? canonicalSource(String(value)) : String(value);
+        const names = new Set([
+          ...values.map((item) => canonical(asObject(item)[key])),
+          ...old.map((item) => canonical(item[key])),
+          ...next.map((item) => canonical(item[key])),
+        ]);
+        return Array.from(names, (name) => {
+          const baseTotal = values
+            .filter((item) => canonical(asObject(item)[key]) === name)
+            .reduce((sum, item) => sum + toCents(asObject(item).total), 0);
+          const previous = old
+            .filter((item) => canonical(item[key]) === name)
+            .reduce((sum, item) => sum + toCents(item.total), 0);
+          const updated = next
+            .filter((item) => canonical(item[key]) === name)
+            .reduce((sum, item) => sum + toCents(item.total), 0);
+          return {
+            [key]: name,
+            total: ((baseTotal - previous + updated) / 100).toFixed(2),
+          };
+        }).filter((item) => Number(item.total) > 0);
+      };
       return {
         ...saved,
         offline: true,
@@ -403,6 +460,18 @@ export class OfflineClient {
           expense: adjust(base.expense, before.expense, after.expense),
           daily: changeBuckets(base.daily, before.daily, after.daily),
           monthly: changeBuckets(base.monthly, before.monthly, after.monthly),
+          expenseCategories: changeGroups(
+            base.expenseCategories,
+            before.expenseCategories,
+            after.expenseCategories,
+            "category",
+          ),
+          incomeSources: changeGroups(
+            base.incomeSources,
+            before.incomeSources,
+            after.incomeSources,
+            "source",
+          ),
         },
       };
     }

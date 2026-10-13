@@ -32,7 +32,7 @@ export default function Loans(): JSX.Element {
   const [dueDate, setDueDate] = useState(new Date());
   const queryClient = useQueryClient();
   const offline = useOfflineStatus();
-  const { colors } = usePreferences();
+  const { colors, formatMoney } = usePreferences();
 
   const [kind, setKind] = useState<LoanKind>("taken");
   const [form, setForm] = useState(initialForm);
@@ -108,12 +108,6 @@ export default function Loans(): JSX.Element {
         keyboardShouldPersistTaps="handled"
         contentContainerClassName="px-5 pb-8 pt-6"
       >
-        {(!offline.online || offline.pending > 0) && (
-          <Text className="mb-4 text-sm text-app-subtle">
-            Your saved loans are available here. Connect and finish syncing to add loans or
-            payments.
-          </Text>
-        )}
         {/* Header */}
 
         <View className="mb-7">
@@ -123,6 +117,23 @@ export default function Loans(): JSX.Element {
             Track money you borrow and lend, including repayments.
           </Text>
         </View>
+
+        {!isLoading && !hasError && (
+          <View className="mb-5 flex-row gap-3">
+            <View className="flex-1 rounded-2xl border border-app-border bg-amber-500/10 p-4">
+              <Text className="text-xs text-app-subtle">Still to repay</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit className="mt-1 text-lg font-semibold text-app-text">
+                {formatMoney(takenLoans.reduce((sum, loan) => sum + Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount)), 0))}
+              </Text>
+            </View>
+            <View className="flex-1 rounded-2xl border border-app-border bg-emerald-500/10 p-4">
+              <Text className="text-xs text-app-subtle">Still owed to you</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit className="mt-1 text-lg font-semibold text-app-text">
+                {formatMoney(givenLoans.reduce((sum, loan) => sum + Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount)), 0))}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Add Loan */}
 
@@ -366,7 +377,9 @@ function LoanRow({
 
   const person = "borrowedFrom" in loan ? loan.borrowedFrom : loan.borrowerName;
 
-  const outstanding = Number(loan.totalAmount) - Number(loan.paidAmount);
+  const outstanding = Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount));
+  const paidProgress = Number(loan.totalAmount) > 0 ? Math.min(100, (Number(loan.paidAmount) / Number(loan.totalAmount)) * 100) : 0;
+  const [paymentError, setPaymentError] = useState("");
 
   const paymentMutation = useMutation({
     mutationFn: () =>
@@ -389,14 +402,17 @@ function LoanRow({
   const submitPayment = () => {
     const value = Number(amount);
 
-    if (!value || value <= 0) {
+    if (!Number.isFinite(value) || value <= 0) {
+      setPaymentError("Enter an amount greater than zero.");
       return;
     }
 
     if (value > outstanding) {
+      setPaymentError(`Payment cannot exceed ${formatMoney(outstanding)}.`);
       return;
     }
 
+    setPaymentError("");
     paymentMutation.mutate();
   };
 
@@ -448,25 +464,30 @@ function LoanRow({
         <Text className="mt-1 text-xl font-semibold text-app-text">{formatMoney(outstanding)}</Text>
 
         <Text className="mt-1 text-xs text-app-subtle">
-          of {formatMoney(Number(loan.totalAmount))}
+          Paid {formatMoney(Number(loan.paidAmount))} of {formatMoney(Number(loan.totalAmount))}
         </Text>
+        <View accessibilityRole="progressbar" accessibilityLabel={`Loan repayment progress for ${person}`} accessibilityValue={{ min: 0, max: 100, now: Math.round(paidProgress) }} className="mt-2 h-2 overflow-hidden rounded-full bg-app-muted">
+          <View className="h-full rounded-full bg-app-primary" style={{ width: `${paidProgress}%` }} />
+        </View>
       </View>
 
       {/* Payment */}
 
       {loan.status !== "paid" && (
         <View className="mt-5">
-          <Text className="mb-2 text-xs font-medium text-app-subtle">Record payment</Text>
-
-          <View className="flex-row">
-            <TextInput
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-              placeholder="Payment amount"
-              placeholderTextColor="#52525b"
-              className="h-11 flex-1 rounded-xl border border-app-border bg-app-bg px-3 text-app-text"
-            />
+          <View className="flex-row items-end gap-2">
+            <View className="min-w-0 flex-1">
+              <Text className="mb-2 text-xs font-medium text-app-subtle">Payment amount</Text>
+              <TextInput
+                accessibilityLabel={`Payment amount for ${person}`}
+                value={amount}
+                onChangeText={(value) => { setAmount(value); setPaymentError(""); }}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor="#52525b"
+                className="h-11 rounded-xl border border-app-border bg-app-bg px-3 text-base text-app-text"
+              />
+            </View>
 
             <Pressable
               disabled={
@@ -478,15 +499,17 @@ function LoanRow({
               }`}
             >
               {paymentMutation.isPending ? (
-                <ActivityIndicator color={colors.onPrimary} />
+                <View className="flex-row items-center"><ActivityIndicator color={colors.onPrimary} /><Text className="ml-2 text-xs font-semibold text-app-on-primary">Recording…</Text></View>
               ) : (
-                <Text className="text-sm font-semibold text-app-on-primary">Record</Text>
+                <Text className="text-center text-xs font-semibold text-app-on-primary">Record payment</Text>
               )}
             </Pressable>
           </View>
 
-          {paymentMutation.isError && (
-            <Text className="mt-2 text-xs text-red-400">Unable to record payment.</Text>
+          {(paymentError || paymentMutation.isError) && (
+            <Text accessibilityRole="alert" className="mt-2 text-xs text-red-400">
+              {paymentError || paymentMutation.error?.message || "Unable to record payment."}
+            </Text>
           )}
         </View>
       )}

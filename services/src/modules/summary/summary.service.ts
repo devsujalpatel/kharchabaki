@@ -8,8 +8,15 @@ export const getDashboardSummary = async (userId: string, month?: string) => {
   const range = monthRange(month);
   const trendStart = new Date(range.start);
   trendStart.setUTCMonth(trendStart.getUTCMonth() - 5);
-  const [owner, incomes, expenses, monthlyIncomes, monthlyExpenses] =
-    await Promise.all([
+  const [
+    owner,
+    incomes,
+    expenses,
+    expensesByCategory,
+    incomesBySource,
+    monthlyIncomes,
+    monthlyExpenses,
+  ] = await Promise.all([
       db
         .select({ balance: user.balance })
         .from(user)
@@ -45,6 +52,34 @@ export const getDashboardSummary = async (userId: string, month?: string) => {
         .groupBy(sql`to_char(${expense.spentAt}, 'YYYY-MM-DD')`),
       db
         .select({
+          category: expense.category,
+          total: sql<string>`sum(${expense.amount})`,
+        })
+        .from(expense)
+        .where(
+          and(
+            eq(expense.userId, userId),
+            gte(expense.spentAt, range.start),
+            lt(expense.spentAt, range.end),
+          ),
+        )
+        .groupBy(expense.category),
+      db
+        .select({
+          source: income.source,
+          total: sql<string>`sum(${income.amount})`,
+        })
+        .from(income)
+        .where(
+          and(
+            eq(income.userId, userId),
+            gte(income.receivedAt, range.start),
+            lt(income.receivedAt, range.end),
+          ),
+        )
+        .groupBy(income.source),
+      db
+        .select({
           month: sql<string>`to_char(${income.receivedAt}, 'YYYY-MM')`,
           total: sql<string>`sum(${income.amount})`,
         })
@@ -75,6 +110,27 @@ export const getDashboardSummary = async (userId: string, month?: string) => {
   if (!owner[0]) throw new ApiError(404, 'User not found');
   const incomeByDay = new Map(incomes.map((row) => [row.day, row.total]));
   const expenseByDay = new Map(expenses.map((row) => [row.day, row.total]));
+  const expenseCategories = expensesByCategory.map((row) => ({
+    category: row.category,
+    total: Number(row.total).toFixed(2),
+  }));
+  const sourceTotals = new Map<string, number>();
+  incomesBySource.forEach((row) => {
+    const source =
+      row.source === 'invesment'
+        ? 'investment'
+        : row.source === 'bonues'
+          ? 'bonus'
+          : row.source;
+    sourceTotals.set(
+      source,
+      (sourceTotals.get(source) ?? 0) + Math.round(Number(row.total) * 100),
+    );
+  });
+  const incomeSources = Array.from(sourceTotals, ([source, total]) => ({
+    source,
+    total: (total / 100).toFixed(2),
+  }));
   const daily = Array.from(
     { length: new Date(range.end.getTime() - 1).getUTCDate() },
     (_, index) => {
@@ -100,6 +156,8 @@ export const getDashboardSummary = async (userId: string, month?: string) => {
   });
   return {
     monthly,
+    expenseCategories,
+    incomeSources,
     balance: owner[0].balance,
     month: range.month,
     daily,

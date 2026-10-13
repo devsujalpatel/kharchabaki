@@ -20,6 +20,7 @@ import { sessionManager } from "@/lib/offline-client";
 import { authClient } from "@/lib/auth-client";
 
 import { PreferencesSettings } from "@/components/PreferencesSettings";
+import { SyncStatus } from "@/components/SyncStatus";
 import { usePreferences } from "@/lib/preferences";
 import { api } from "@/lib/api";
 
@@ -151,9 +152,11 @@ export default function Profile(): JSX.Element {
           </Text>
         </View>
 
+        <SyncStatus />
+
         {/* Personal Information */}
 
-        <View className="rounded-[22px] border border-app-border bg-app-card">
+        <View className="mt-5 rounded-[22px] border border-app-border bg-app-card">
           <View className="p-5">
             <Text className="text-lg font-medium text-app-text">Personal information</Text>
 
