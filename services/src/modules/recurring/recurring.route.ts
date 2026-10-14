@@ -19,16 +19,15 @@ const schema = z.object({
   enabled: z.boolean().default(true),
 });
 const uuid = z.string().uuid();
-const addInterval = (date: Date, schedule: string, interval: number, anchorDay = date.getUTCDate()) => {
+export const addInterval = (date: Date, schedule: string, interval: number, anchorDay = date.getUTCDate()) => {
   const next = new Date(date);
   if (schedule === 'daily') next.setUTCDate(next.getUTCDate() + interval);
   if (schedule === 'weekly') next.setUTCDate(next.getUTCDate() + 7 * interval);
   if (schedule === 'monthly') {
-    const day = date.getUTCDate();
     next.setUTCDate(1);
     next.setUTCMonth(next.getUTCMonth() + interval);
     const last = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
-    next.setUTCDate(Math.min(day, last));
+    next.setUTCDate(Math.min(anchorDay, last));
   }
   if (schedule === 'yearly') next.setUTCFullYear(next.getUTCFullYear() + interval);
   return next;

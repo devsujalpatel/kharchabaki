@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { sql } from 'drizzle-orm';
+import { db } from '../database/client.js';
 import { ApiResponse } from '../types/common.types.js';
 import { SERVICE_NAME } from '../config/constans.js';
 
@@ -38,6 +40,23 @@ apiRouter.get('/health', (_request, response) => {
     },
   };
   response.status(200).json(body);
+});
+
+apiRouter.get('/ready', async (_request, response) => {
+  try {
+    await db.execute(sql`select 1`);
+    response.status(200).json({
+      success: true,
+      message: 'Service is ready',
+      data: { service: SERVICE_NAME, status: 'ready' },
+    });
+  } catch {
+    response.status(503).json({
+      success: false,
+      message: 'Service is not ready',
+      data: { service: SERVICE_NAME, status: 'not_ready' },
+    });
+  }
 });
 
 apiRouter.use(authRouter);

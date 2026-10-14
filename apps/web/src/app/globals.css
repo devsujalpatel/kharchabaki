@@ -38,6 +38,8 @@
   /* Destructive */
   --destructive: oklch(62% 0.22 25);
   --destructive-foreground: oklch(98% 0 0);
+  --income: #86efac;
+  --expense: #fca5a5;
 
   /* Borders and inputs */
   --border: oklch(28% 0.018 115);
@@ -145,6 +147,8 @@
 
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-income: var(--income);
+  --color-expense: var(--expense);
 
   --color-border: var(--border);
   --color-input: var(--input);
@@ -223,6 +227,8 @@ html.light {
   --sidebar-accent-foreground: #4d7c0f;
   --sidebar-border: #cbd5e1;
   --sidebar-ring: #4d7c0f;
+  --income: #166534;
+  --expense: #b91c1c;
   --lime: #4d7c0f;
   --surface-deep: #f8fafc;
   --surface-raised: #ffffff;
@@ -258,6 +264,8 @@ html.dark {
   --sidebar-accent-foreground: #cbff3d;
   --sidebar-border: #364036;
   --sidebar-ring: #cbff3d;
+  --income: #86efac;
+  --expense: #fca5a5;
   --lime: #cbff3d;
   --surface-deep: #090b09;
   --surface-raised: #151915;
@@ -293,6 +301,8 @@ html.ocean {
   --sidebar-accent-foreground: #67d9f5;
   --sidebar-border: #31566f;
   --sidebar-ring: #67d9f5;
+  --income: #6ee7b7;
+  --expense: #fca5a5;
   --lime: #67d9f5;
   --surface-deep: #081927;
   --surface-raised: #102b40;
@@ -328,6 +338,8 @@ html.forest {
   --sidebar-accent-foreground: #86efac;
   --sidebar-border: #39644c;
   --sidebar-ring: #86efac;
+  --income: #86efac;
+  --expense: #fca5a5;
   --lime: #86efac;
   --surface-deep: #0b1b15;
   --surface-raised: #153025;
@@ -363,6 +375,8 @@ html.sunset {
   --sidebar-accent-foreground: #fdba74;
   --sidebar-border: #70414b;
   --sidebar-ring: #fdba74;
+  --income: #86efac;
+  --expense: #fca5a5;
   --lime: #fdba74;
   --surface-deep: #241319;
   --surface-raised: #3a2028;
@@ -398,6 +412,8 @@ html.rose {
   --sidebar-accent-foreground: #be185d;
   --sidebar-border: #e9b8ce;
   --sidebar-ring: #be185d;
+  --income: #166534;
+  --expense: #be123c;
   --lime: #be185d;
   --surface-deep: #fff5f8;
   --surface-raised: #ffffff;

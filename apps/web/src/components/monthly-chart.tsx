@@ -41,8 +41,8 @@ export function MonthlyChart({
         ))}
       </div>
       <div className="my-3 flex gap-4 text-sm">
-        <span className="text-emerald-600">● Income</span>
-        <span className="text-red-500">● Expenses</span>
+        <span className="text-income">● Income</span>
+        <span className="text-expense">● Expenses</span>
       </div>
       {!series.some((day) => Number(day.income) || Number(day.expense)) && (
         <p className="mb-3 text-sm text-muted-foreground">
@@ -67,7 +67,7 @@ export function MonthlyChart({
             >
               <div className="flex h-40 items-end justify-center gap-0.5 border-b">
                 <div
-                  className="w-1/3 rounded-t bg-emerald-500"
+                  className="w-1/3 rounded-t bg-income"
                   style={{
                     height: Number(day.income)
                       ? `${Math.max(1, (Number(day.income) / max) * 100)}%`
@@ -75,7 +75,7 @@ export function MonthlyChart({
                   }}
                 />
                 <div
-                  className="w-1/3 rounded-t bg-red-400"
+                  className="w-1/3 rounded-t bg-expense"
                   style={{
                     height: Number(day.expense)
                       ? `${Math.max(1, (Number(day.expense) / max) * 100)}%`

@@ -77,11 +77,11 @@ export default function Dashboard() {
         <Button
           type="button"
           variant="outline"
-          className="h-auto min-h-24 flex-col items-start gap-3 rounded-2xl border-red-500/20 bg-red-500/5 p-4 hover:bg-red-500/10"
+          className="h-auto min-h-24 flex-col items-start gap-3 rounded-2xl border-expense/20 bg-expense/5 p-4 hover:bg-expense/10"
           aria-haspopup="dialog"
           onClick={() => setEntryType("expense")}
         >
-          <span className="flex size-9 items-center justify-center rounded-xl bg-red-500/10 text-red-500">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-expense/10 text-expense">
             <Plus className="size-5" />
           </span>
           <span className="text-sm font-semibold">Add expense</span>
@@ -89,11 +89,11 @@ export default function Dashboard() {
         <Button
           type="button"
           variant="outline"
-          className="h-auto min-h-24 flex-col items-start gap-3 rounded-2xl border-emerald-500/20 bg-emerald-500/5 p-4 hover:bg-emerald-500/10"
+          className="h-auto min-h-24 flex-col items-start gap-3 rounded-2xl border-income/20 bg-income/5 p-4 hover:bg-income/10"
           aria-haspopup="dialog"
           onClick={() => setEntryType("income")}
         >
-          <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-income/10 text-income">
             <Plus className="size-5" />
           </span>
           <span className="text-sm font-semibold">Add income</span>
@@ -128,8 +128,8 @@ function SummaryCard({
       className={cn(
         "overflow-hidden rounded-2xl",
         !type && "col-span-2 border-primary/25 bg-primary/5 sm:col-span-1",
-        type === "income" && "bg-emerald-500/5",
-        type === "expense" && "bg-red-500/5",
+        type === "income" && "bg-income/5",
+        type === "expense" && "bg-expense/5",
       )}
     >
       <CardContent className="flex items-center justify-between gap-2 p-4 sm:p-5">
@@ -149,8 +149,8 @@ function SummaryCard({
         <span
           className={cn(
             "flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary",
-            type === "income" && "bg-emerald-500/10 text-emerald-500",
-            type === "expense" && "bg-red-500/10 text-red-500",
+            type === "income" && "bg-income/10 text-income",
+            type === "expense" && "bg-expense/10 text-expense",
           )}
         >
           <Icon className="size-4" />

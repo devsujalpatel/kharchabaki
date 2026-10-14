@@ -17,6 +17,7 @@ process.env.NODE_ENV = 'test';
 const memory = { user: [], session: [], account: [], verification: [] };
 const dialect = new PgDialect();
 let calls = [];
+let databaseReady = true;
 function builder(operation, table, projection) {
   const call = { operation, table, projection };
   calls.push(call);
@@ -43,6 +44,9 @@ function builder(operation, table, projection) {
   return result;
 }
 const db = {
+  execute() {
+    return databaseReady ? Promise.resolve([]) : Promise.reject(new Error('database offline'));
+  },
   select(projection) { return builder('select', null, projection); },
   update(table) { return builder('update', table); },
   query: {
@@ -138,14 +142,29 @@ test('premium accounts can fetch their cloud data and update balance using the a
   assert.equal(memory.user.find((account) => account.id === basic.id).balance, undefined);
 });
 
-test('/me returns current entitlement for either account and health remains public', async () => {
+test('/me, liveness, and readiness report public service state', async () => {
   for (const [account, isPremium] of [[basic, false], [premium, true]]) {
     const result = await request('/me', { account, headers: { 'X-Account-ID': account.id } });
     assert.equal(result.response.status, 200);
     assert.equal(result.body.data.session.user.id, account.id);
     assert.equal(result.body.data.session.user.isPremium, isPremium);
   }
+
   assert.equal((await request('/health', { account: null })).response.status, 200);
+  const ready = await request('/ready', { account: null });
+  assert.equal(ready.response.status, 200);
+  assert.equal(ready.body.data.status, 'ready');
+
+  databaseReady = false;
+  try {
+    const unavailable = await request('/ready', { account: null });
+    assert.equal(unavailable.response.status, 503);
+    assert.deepEqual(unavailable.body.data, { service: 'kharchabaaki-services', status: 'not_ready' });
+    assert.equal(unavailable.body.message, 'Service is not ready');
+    assert.equal((await request('/health', { account: null })).response.status, 200);
+  } finally {
+    databaseReady = true;
+  }
 });
 
 test('missing sessions and mismatched account headers never reach premium or financial data', async () => {

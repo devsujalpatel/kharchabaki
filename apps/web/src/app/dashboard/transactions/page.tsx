@@ -236,8 +236,8 @@ export default function Transactions() {
                         className={cn(
                           "flex size-10 items-center justify-center rounded-2xl",
                           isIncome
-                            ? "bg-emerald-500/10 text-emerald-500"
-                            : "bg-red-500/10 text-red-500",
+                            ? "bg-income/10 text-income"
+                            : "bg-expense/10 text-expense",
                         )}
                       >
                         <Icon className="size-4" />
@@ -265,7 +265,7 @@ export default function Transactions() {
                         <p
                           className={cn(
                             "truncate text-sm font-semibold tabular-nums",
-                            isIncome ? "text-emerald-500" : "text-red-500",
+                            isIncome ? "text-income" : "text-expense",
                           )}
                           title={money}
                         >

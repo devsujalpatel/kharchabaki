@@ -66,25 +66,25 @@ export default function Home() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
-      <section className="relative border-b border-white/7">
+      <section className="relative border-b border-border">
         <div className="absolute inset-0 grid-bg opacity-60" />
         <div className="absolute left-1/2 top-0 h-132.5 w-162.5 -translate-x-1/2 rounded-full bg-primary/13 blur-[125px]" />
         <nav className="relative mx-auto flex h-19.5 max-w-7xl items-center justify-between px-5 lg:px-8">
           <Logo />
           <div className="hidden items-center gap-7 text-sm text-muted-foreground/70 md:flex">
-            <a href="#features" className="hover:text-white transition-colors">
+            <a href="#features" className="hover:text-foreground transition-colors">
               Features
             </a>
             <a
               href="#how-it-works"
-              className="hover:text-white transition-colors"
+              className="hover:text-foreground transition-colors"
             >
               How it works
             </a>
-            <a href="#pricing" className="hover:text-white transition-colors">
+            <a href="#pricing" className="hover:text-foreground transition-colors">
               Pricing
             </a>
-            <a href="#faq" className="hover:text-white transition-colors">
+            <a href="#faq" className="hover:text-foreground transition-colors">
               FAQ
             </a>
           </div>
@@ -92,7 +92,7 @@ export default function Home() {
             <Link href="/auth/signin">
               <Button
                 variant="ghost"
-                className="text-muted-foreground hover:bg-white/5 hover:text-white"
+                className="text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 Log in
               </Button>
@@ -100,7 +100,7 @@ export default function Home() {
             {/*<Link href="/auth/signup">
               <Button
                 variant="ghost"
-                className="text-muted-foreground hover:bg-white/5 hover:text-white"
+                className="text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 Sign up
               </Button>
@@ -140,7 +140,7 @@ export default function Home() {
                   duration: 0.25,
                   ease: [0.22, 1, 0.36, 1],
                 }}
-                className="absolute right-5 top-16 z-20 w-52 rounded-xl border border-white/10 bg-[#20241d] p-3 shadow-2xl md:hidden"
+                className="absolute right-5 top-16 z-20 w-52 rounded-xl border border-border bg-popover p-3 text-popover-foreground shadow-2xl md:hidden"
               >
                 {["Features", "How it works", "Pricing", "FAQ"].map(
                   (x, index) => (
@@ -155,7 +155,7 @@ export default function Home() {
                         delay: index * 0.035,
                         ease: "easeOut",
                       }}
-                      className="block rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/5"
+                      className="block rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted"
                     >
                       {x}
                     </motion.a>
@@ -178,7 +178,7 @@ export default function Home() {
           </AnimatePresence>
         </nav>
         <div className="relative mx-auto max-w-5xl px-5 pb-0 pt-16 text-center sm:pt-24">
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#caff3d]/25 bg-[#caff3d]/8 px-3 py-1.5 text-xs font-medium text-[#d9ff83]">
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/8 px-3 py-1.5 text-xs font-medium text-primary">
             <Sparkles className="size-3.5" />
             The calm way to manage money
           </div>
@@ -187,7 +187,7 @@ export default function Home() {
             <br />
             <span className="text-balance text-primary">Save with intent.</span>
           </h1>
-          <p className="mx-auto mt-7 max-w-xl text-pretty text-base leading-relaxed text-[#a7afa0] sm:text-lg">
+          <p className="mx-auto mt-7 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
             Kharchabaki turns your everyday money into a simple, beautiful
             picture—so every rupee has a purpose.
           </p>
@@ -195,7 +195,7 @@ export default function Home() {
             <Link href="/dashboard">
               <Button
                 size="lg"
-                className="h-12 bg-primary px-5 font-semibold text-muted hover:bg-primary/80 w-52 sm:w-55"
+                className="h-12 bg-primary px-5 font-semibold text-primary-foreground hover:bg-primary/80 w-52 sm:w-55"
               >
                 Start tracking for free <ArrowRight />
               </Button>
@@ -205,18 +205,18 @@ export default function Home() {
               <Button
                 size="lg"
                 variant="outline"
-                className="h-12 border-white/15 bg-white/3 px-5 text-white hover:bg-white/8 hover:text-foreground w-52"
+                className="h-12 border-border bg-background px-5 text-foreground hover:bg-muted w-52"
               >
-                <span className="grid size-5 place-items-center rounded-full bg-white text-[9px] text-black">
+                <span className="grid size-5 place-items-center rounded-full bg-primary text-[9px] text-primary-foreground">
                   ▶
                 </span>{" "}
                 See how it works
               </Button>
             </Link>
           </div>
-          <div className="mt-5 flex items-center justify-center gap-2 text-xs text-[#8e9789]">
+          <div className="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Check className="size-3.5 text-muted-foreground" />
-            No credit card needed <span className="mx-1 text-white/20">
+            No credit card needed <span className="mx-1 text-foreground/20">
               •
             </span>{" "}
             Free forever plan
@@ -230,11 +230,11 @@ export default function Home() {
             <p className="font-mono text-xs uppercase tracking-[.18em] text-primary">
               Built for real life
             </p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-[-.055em] text-white sm:text-5xl">
+            <h2 className="mt-3 text-4xl font-semibold tracking-[-.055em] text-foreground sm:text-5xl">
               Your money, in focus.
             </h2>
           </div>
-          <p className="max-w-sm text-sm leading-relaxed text-[#9ea69a]">
+          <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
             Everything you need to make better decisions, without the
             spreadsheet headache.
           </p>
@@ -243,20 +243,20 @@ export default function Home() {
           {features.map(({ icon: Icon, title, body, color }) => (
             <article
               key={title}
-              className="group relative min-h-62.5 overflow-hidden rounded-2xl border border-white/9 bg-secondary p-6 transition-transform duration-300 hover:-translate-y-1"
+              className="group relative min-h-62.5 overflow-hidden rounded-2xl border border-border bg-secondary p-6 transition-transform duration-300 hover:-translate-y-1"
             >
               <div
                 className={`grid size-11 place-items-center rounded-xl ${color}`}
               >
                 <Icon className="size-5" />
               </div>
-              <h3 className="mt-8 text-xl font-medium tracking-tight text-white">
+              <h3 className="mt-8 text-xl font-medium tracking-tight text-foreground">
                 {title}
               </h3>
-              <p className="mt-2 max-w-66.25 text-sm leading-relaxed text-[#9ba397]">
+              <p className="mt-2 max-w-66.25 text-sm leading-relaxed text-muted-foreground">
                 {body}
               </p>
-              <ArrowUpRight className="absolute bottom-6 right-6 size-5 text-[#829077] transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />
+              <ArrowUpRight className="absolute bottom-6 right-6 size-5 text-muted-foreground transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />
               <div className="absolute -bottom-16 -right-12 size-44 rounded-full border border-white/6" />
             </article>
           ))}
@@ -264,14 +264,14 @@ export default function Home() {
       </section>
       <section
         id="how-it-works"
-        className="border-y border-white/[.07] bg-secondary py-24"
+        className="border-y border-border bg-secondary py-24"
       >
         <div className="mx-auto grid max-w-7xl gap-12 px-5 lg:grid-cols-[.8fr_1.2fr] lg:px-8">
           <div>
             <p className="font-mono text-xs uppercase tracking-[.18em] text-primary">
               A better money ritual
             </p>
-            <h2 className="mt-3 text-4xl font-semibold tracking-[-.055em] text-white sm:text-5xl">
+            <h2 className="mt-3 text-4xl font-semibold tracking-[-.055em] text-foreground sm:text-5xl">
               Three steps to a little more peace.
             </h2>
             <p className="mt-5 max-w-md text-sm leading-relaxed text-foreground">
@@ -279,7 +279,7 @@ export default function Home() {
               to. We made that one.
             </p>
             <Link href={"/dashboard"}>
-              <Button className="mt-8 bg-primary text-muted hover:bg-primary/80">
+              <Button className="mt-8 bg-primary text-primary-foreground hover:bg-primary/80">
                 Make money make sense <ArrowRight />
               </Button>
             </Link>
@@ -287,20 +287,20 @@ export default function Home() {
           <div className="space-y-3">
             {steps.map(([number, title, copy, Icon], i) => (
               <div
-                className={`group flex gap-5 rounded-2xl border p-5 transition-colors ${i === 0 ? "border-primary/25 bg-primary/5" : "border-white/[.07] bg-secondary hover:border-white/15"}`}
+                className={`group flex gap-5 rounded-2xl border p-5 transition-colors ${i === 0 ? "border-primary/25 bg-primary/5" : "border-border bg-secondary hover:border-ring/50"}`}
                 key={title}
               >
                 <span
-                  className={`font-mono text-xs ${i === 0 ? "text-[#d5ff62]" : "text-[#727b6e]"}`}
+                  className={`font-mono text-xs ${i === 0 ? "text-primary" : "text-muted-foreground"}`}
                 >
                   {number}
                 </span>
                 <div className="flex-1">
-                  <h3 className="font-medium text-white">{title}</h3>
+                  <h3 className="font-medium text-foreground">{title}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{copy}</p>
                 </div>
                 <Icon
-                  className={`size-5 ${i === 0 ? "text-[#cbff3d]" : "text-[#849078]"}`}
+                  className={`size-5 ${i === 0 ? "text-primary" : "text-muted-foreground"}`}
                 />
               </div>
             ))}
@@ -315,10 +315,10 @@ export default function Home() {
         <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-accent-foreground/8 px-6 py-12 text-center sm:px-12">
           <div className="absolute inset-0 grid-bg opacity-30" />
           <div className="relative">
-            <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary text-muted">
+            <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary text-primary-foreground">
               <BadgeIndianRupee className="size-6" />
             </div>
-            <h2 className="mt-5 text-4xl font-semibold tracking-[-.06em] text-white sm:text-5xl">
+            <h2 className="mt-5 text-4xl font-semibold tracking-[-.06em] text-foreground sm:text-5xl">
               A richer life doesn&apos;t
               <br />
               need a pricey app.
@@ -344,7 +344,7 @@ export default function Home() {
             <Link href="/dashboard">
               <Button
                 size="lg"
-                className="mt-8 h-12 bg-primary px-5 font-semibold text-muted hover:bg-primary/80"
+                className="mt-8 h-12 bg-primary px-5 font-semibold text-primary-foreground hover:bg-primary/80"
               >
                 Get started—it&apos;s free <ArrowRight />
               </Button>
@@ -352,7 +352,7 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <footer id="faq" className="border-t border-white/[.07] bg-secondary/60">
+      <footer id="faq" className="border-t border-border bg-secondary/60">
         <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-10 sm:flex-row sm:items-center sm:justify-between lg:px-8">
           <div>
             <Logo />
