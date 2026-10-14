@@ -1,4 +1,5 @@
 import express from 'express';
+import { isIP } from 'node:net';
 import cors from 'cors';
 import { ApiResponse } from './types/common.types.js';
 import { API_PREFIX } from './config/constans.js';
@@ -10,10 +11,11 @@ import { auth } from './lib/auth.js';
 import helmet from 'helmet';
 import { env } from './config/env.js';
 import cookieParser from 'cookie-parser';
-import { rateLimit } from 'express-rate-limit';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 
 const app = express();
 
+app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
 const acceptedOrigins = [env.webUrl, env.appUrl];
@@ -23,7 +25,14 @@ const limiter = rateLimit({
   limit: 100,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
-  ipv6Subnet: 56,
+  keyGenerator: (req) => {
+    const forwarded = req.headers.forwarded?.split(',')[0];
+    const forwardedFor = forwarded?.match(/(?:^|;)\s*for=("?)(\[[^\]]+\]|[^;,\"]+)\1/i)?.[2];
+    const forwardedIp = forwardedFor?.replace(/^\[|\]$/g, '');
+    const ip = forwardedIp && isIP(forwardedIp) ? forwardedIp : req.ip ?? req.socket.remoteAddress ?? 'unknown';
+
+    return ipKeyGenerator(ip, 56);
+  },
 });
 
 app.use(limiter);
