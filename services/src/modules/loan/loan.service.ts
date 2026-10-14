@@ -20,6 +20,7 @@ type CreateTakenLoanInput = {
 type CreateGivenLoanInput = {
   amount: string;
   borrowerName: string;
+  phoneNumber?: string | null;
   dueDate: Date;
   interest: string;
 };
@@ -114,6 +115,7 @@ export const createGivenLoan = async (
         userId,
         amount: data.amount,
         borrowerName: data.borrowerName,
+        phoneNumber: data.phoneNumber?.trim() || null,
         dueDate: data.dueDate,
         interest: data.interest,
         totalAmount,
@@ -227,6 +229,7 @@ export const updateGivenLoan = async (
       .set({
         amount,
         borrowerName: data.borrowerName,
+        phoneNumber: data.phoneNumber?.trim() || null,
         dueDate: data.dueDate,
         interest,
         totalAmount,

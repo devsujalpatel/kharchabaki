@@ -23,3 +23,5 @@ export async function transport(path: string, init?: RequestInit) {
 }
 export const offlineClient = new OfflineClient(AsyncStorage, transport, randomUUID);
 export const sessionManager = new SessionManager(AsyncStorage, offlineClient, transport);
+export const exportFinanceArchive = () => offlineClient.exportFinanceArchive();
+export const restoreFinanceArchive = (value: unknown) => offlineClient.restoreFinanceArchive(value);

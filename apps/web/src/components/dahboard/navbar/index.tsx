@@ -10,6 +10,9 @@ import {
   LogOut,
   HandCoins,
   ChartNoAxesCombined,
+  Wallet,
+  CalendarClock,
+  Tags,
 } from "lucide-react";
 
 import { useAppSession } from "@/components/providers/session-provider";
@@ -46,6 +49,21 @@ const navigation = [
     label: "Loans",
     href: "/dashboard/loans",
     icon: HandCoins,
+  },
+  {
+    label: "Budgets",
+    href: "/dashboard/budgets",
+    icon: Wallet,
+  },
+  {
+    label: "Recurring",
+    href: "/dashboard/recurring",
+    icon: CalendarClock,
+  },
+  {
+    label: "Categories",
+    href: "/dashboard/categories",
+    icon: Tags,
   },
 ];
 

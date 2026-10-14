@@ -30,6 +30,7 @@ export type GivenLoan = {
   totalAmount: string;
   interest: string;
   borrowerName: string;
+  phoneNumber: string | null;
   dueDate: string;
   status: LoanStatus;
   createdAt: string;
@@ -66,7 +67,7 @@ export async function createTakenLoan(
 }
 
 export async function createGivenLoan(
-  data: CreateLoanInput & { borrowerName: string },
+  data: CreateLoanInput & { borrowerName: string; phoneNumber?: string },
 ): Promise<ApiResponse<GivenLoan>> {
   return api<ApiResponse<GivenLoan>>("/loans/given", {
     method: "POST",
@@ -86,7 +87,7 @@ export async function updateTakenLoan(
 
 export async function updateGivenLoan(
   loanId: string,
-  data: CreateLoanInput & { borrowerName: string },
+  data: CreateLoanInput & { borrowerName: string; phoneNumber?: string },
 ): Promise<ApiResponse<GivenLoan>> {
   return api<ApiResponse<GivenLoan>>(`/loans/given/${loanId}`, {
     method: "PATCH",

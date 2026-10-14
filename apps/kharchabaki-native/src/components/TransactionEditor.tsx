@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import { Check, CircleAlert } from "lucide-react-native";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { DateField } from "@/components/DateField";
 import { FormSheet } from "@/components/FormSheet";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/finance";
 import { usePreferences } from "@/lib/preferences";
 import { updateTransaction, type Transaction } from "@/services/transactions";
+import { getLabels } from "@/lib/finance-features";
 
 export function TransactionEditor({
   transaction,
@@ -27,7 +28,8 @@ export function TransactionEditor({
   const [category, setCategory] = useState(transaction.source ?? transaction.category ?? "other");
   const [description, setDescription] = useState(transaction.description ?? "");
   const [date, setDate] = useState(transaction.occurredAt.slice(0, 10));
-  const options = transaction.type === "income" ? incomeSources : expenseCategories;
+  const labels = useQuery({ queryKey: ["finance-labels"], queryFn: getLabels });
+  const options = [...(transaction.type === "income" ? incomeSources : expenseCategories), ...(labels.data?.data ?? []).filter((item) => item.kind === transaction.type).map((item) => item.key), category];
   const mutation = useMutation({
     mutationFn: updateTransaction,
     onSuccess: async () => {

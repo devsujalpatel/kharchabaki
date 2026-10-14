@@ -71,6 +71,20 @@
       "when": 1791961689076,
       "tag": "0009_premium_entitlement",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791965540502,
+      "tag": "0010_damp_tinkerer",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791965860082,
+      "tag": "0011_mighty_jack_power",
+      "breakpoints": true
     }
   ]
 }

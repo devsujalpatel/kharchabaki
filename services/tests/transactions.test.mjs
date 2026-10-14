@@ -310,8 +310,12 @@ test('financial input validation rejects invalid amounts, categories, and dates'
       (error) => error.statusCode === 400,
     );
   }
+  assert.equal(
+    parseInput(expenseInputSchema, { amount: 1, category: 'made-up' }).category,
+    'made-up',
+  );
   assert.throws(() =>
-    parseInput(expenseInputSchema, { amount: 1, category: 'made-up' }),
+    parseInput(expenseInputSchema, { amount: 1, category: 'invalid/@key' }),
   );
   assert.throws(() =>
     parseInput(incomeInputSchema, {

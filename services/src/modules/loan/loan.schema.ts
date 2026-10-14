@@ -25,9 +25,12 @@ export const createTakenLoanSchema = z.object({
   interest: interest.default('0.00'),
 });
 
+const phoneNumber = z.string().trim().max(30).optional().nullable();
+
 export const createGivenLoanSchema = z.object({
   amount: positiveAmount,
   borrowerName: z.string().trim().min(1).max(100),
+  phoneNumber,
   dueDate: z.coerce.date(),
   interest: interest.default('0.00'),
 });
@@ -42,6 +45,7 @@ export const updateTakenLoanSchema = z.object({
 export const updateGivenLoanSchema = z.object({
   amount: positiveAmount,
   borrowerName: z.string().trim().min(1).max(100),
+  phoneNumber,
   dueDate: z.coerce.date(),
   interest: interest.default('0.00'),
 });

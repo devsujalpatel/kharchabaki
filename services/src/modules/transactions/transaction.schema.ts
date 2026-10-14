@@ -1,8 +1,4 @@
 import { z } from 'zod';
-import {
-  expenseCategoryEnum,
-  incomeSourceEnum,
-} from '../../database/schema.js';
 import { ApiError } from '../../utils/api-error.js';
 
 const amount = z
@@ -20,13 +16,14 @@ const common = {
   description: z.string().trim().max(1000).optional(),
   occurredAt: z.iso.datetime().optional(),
 };
+const labelKey = z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9 _-]+$/);
 export const incomeInputSchema = z.object({
   ...common,
-  source: z.enum(incomeSourceEnum.enumValues),
+  source: labelKey,
 });
 export const expenseInputSchema = z.object({
   ...common,
-  category: z.enum(expenseCategoryEnum.enumValues),
+  category: labelKey,
 });
 export type IncomeInput = z.infer<typeof incomeInputSchema>;
 export type ExpenseInput = z.infer<typeof expenseInputSchema>;

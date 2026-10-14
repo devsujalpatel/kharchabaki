@@ -1,13 +1,15 @@
 import { api } from "@/lib/api";
-import type { ExpenseCategory, IncomeSource } from "@/lib/finance";
-export type { ExpenseCategory, IncomeSource } from "@/lib/finance";
+export type ExpenseCategory = string;
+export type IncomeSource = string;
 export type IncomeInput = {
+  id?: string;
   amount: number;
   source: IncomeSource;
   description?: string;
   occurredAt?: string;
 };
 export type ExpenseInput = {
+  id?: string;
   amount: number;
   category: ExpenseCategory;
   description?: string;

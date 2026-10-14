@@ -1,7 +1,7 @@
 import { type JSX, useState } from "react";
 import { ActivityIndicator, Alert, Image, Pressable, Text, TextInput, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, LogIn, LogOut, Pencil, Wallet } from "lucide-react-native";
+import { CalendarClock, Check, ChevronRight, Download, LogIn, LogOut, Pencil, Tags, Wallet } from "lucide-react-native";
 import { router } from "expo-router";
 import { useAppSession, useOfflineStatus } from "@/lib/session-provider";
 import { sessionManager } from "@/lib/offline-client";
@@ -212,6 +212,21 @@ export default function Profile(): JSX.Element {
               Connect and finish syncing to change your opening balance.
             </Text>
           )}
+        </View>
+        <View className="mt-5 rounded-[22px] border border-app-border bg-app-card p-4">
+          <Text className="mb-2 text-sm font-semibold text-app-text">Finance tools</Text>
+          {[
+            { label: "Budgets", href: "/dashboard/budgets", Icon: Wallet },
+            { label: "Recurring entries", href: "/dashboard/recurring", Icon: CalendarClock },
+            { label: "Categories & sources", href: "/dashboard/categories", Icon: Tags },
+            { label: "Import & export", href: "/dashboard/data-tools", Icon: Download },
+          ].map(({ label, href, Icon }) => (
+            <Pressable key={href} onPress={() => router.push(href as never)} className="flex-row items-center gap-3 border-t border-app-border py-3">
+              <Icon size={17} color={colors.primary} />
+              <Text className="flex-1 text-sm text-app-text">{label}</Text>
+              <ChevronRight size={17} color={colors.subtle} />
+            </Pressable>
+          ))}
         </View>
         <PreferencesSettings />
       </KeyboardScreen>

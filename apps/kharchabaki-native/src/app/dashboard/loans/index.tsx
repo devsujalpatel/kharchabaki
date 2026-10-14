@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
+  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -22,8 +23,9 @@ import {
 } from "lucide-react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import * as Linking from "expo-linking";
 import { FormSheet } from "@/components/FormSheet";
-import { useOfflineStatus } from "@/lib/session-provider";
+import { useAppSession, useOfflineStatus } from "@/lib/session-provider";
 import { usePreferences } from "@/lib/preferences";
 import {
   createGivenLoan,
@@ -42,11 +44,12 @@ import {
 } from "@/lib/loan";
 
 type LoanKind = "taken" | "given";
-const initialForm = { amount: "", person: "", interest: "0" };
+const initialForm = { amount: "", person: "", phoneNumber: "", interest: "0" };
 
 export default function Loans(): JSX.Element {
   const queryClient = useQueryClient();
   const offline = useOfflineStatus();
+  const { data: session } = useAppSession();
   const { colors, formatMoney } = usePreferences();
   const [kind, setKind] = useState<LoanKind>("taken");
   const [createKind, setCreateKind] = useState<LoanKind>("taken");
@@ -74,6 +77,7 @@ export default function Loans(): JSX.Element {
         dueDate: formatDateForApi(dueDate),
         interest: form.interest.trim(),
       };
+      const phoneNumber = form.phoneNumber.trim() || undefined;
       if (editingLoan?.kind === "taken")
         return updateTakenLoan(editingLoan.loan.id, {
           ...values,
@@ -83,10 +87,11 @@ export default function Loans(): JSX.Element {
         return updateGivenLoan(editingLoan.loan.id, {
           ...values,
           borrowerName: form.person.trim(),
+          phoneNumber,
         });
       return createKind === "taken"
         ? createTakenLoan({ ...values, borrowedFrom: form.person.trim() })
-        : createGivenLoan({ ...values, borrowerName: form.person.trim() });
+        : createGivenLoan({ ...values, borrowerName: form.person.trim(), phoneNumber });
     },
     onSuccess: () => {
       setShowForm(false);
@@ -121,6 +126,7 @@ export default function Loans(): JSX.Element {
     setForm({
       amount: loan.amount,
       person: "borrowedFrom" in loan ? loan.borrowedFrom : loan.borrowerName,
+      phoneNumber: "borrowedFrom" in loan ? "" : loan.phoneNumber ?? "",
       interest: loan.interest,
     });
     const [year, month, day] = loan.dueDate.slice(0, 10).split("-").map(Number);
@@ -232,6 +238,7 @@ export default function Loans(): JSX.Element {
                 onRefresh={refreshLoans}
                 onEdit={() => openEdit(kind, loan)}
                 canChange={canChange}
+                senderName={session?.user.name || "Kharchabaki user"}
               />
             ))}
           </View>
@@ -292,6 +299,21 @@ export default function Loans(): JSX.Element {
             className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
           />
         </LoanField>
+        {createKind === "given" && (
+          <LoanField label="Mobile number (optional)">
+            <TextInput
+              accessibilityLabel="Borrower mobile number"
+              value={form.phoneNumber}
+              onChangeText={(phoneNumber) => setForm({ ...form, phoneNumber })}
+              keyboardType="phone-pad"
+              placeholder="+91 98765 43210"
+              placeholderTextColor={colors.subtle}
+              editable={!createMutation.isPending}
+              maxLength={30}
+              className="h-12 rounded-xl border border-app-border bg-app-bg px-4 text-app-text"
+            />
+          </LoanField>
+        )}
         <View className="flex-row gap-3">
           <View className="min-w-0 flex-1">
             <LoanField label="Due date">
@@ -392,12 +414,14 @@ function LoanRow({
   onRefresh,
   onEdit,
   canChange,
+  senderName,
 }: {
   kind: LoanKind;
   loan: TakenLoan | GivenLoan;
   onRefresh: () => void;
   onEdit: () => void;
   canChange: boolean;
+  senderName: string;
 }) {
   const { formatMoney, colors } = usePreferences();
   const [showPayment, setShowPayment] = useState(false);
@@ -413,6 +437,20 @@ function LoanRow({
       : 0;
   const paid = loan.status === "paid" || outstanding === 0;
   const accent = kind === "taken" ? "#d97706" : "#059669";
+  const openSmsComposer = async () => {
+    if (kind !== "given" || !("borrowerName" in loan) || !loan.phoneNumber) {
+      Alert.alert("Mobile number missing", "Add a mobile number to this lent loan first.");
+      return;
+    }
+    const body = `Hi ${loan.borrowerName}, you borrowed ${formatMoney(loan.amount)} from ${senderName}. The due date is ${formatDate(loan.dueDate)}.`;
+    const separator = Platform.OS === "ios" ? "&" : "?";
+    const url = `sms:${encodeURIComponent(loan.phoneNumber)}${separator}body=${encodeURIComponent(body)}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert("Messaging unavailable", "No messaging app could open this message.");
+    }
+  };
   const deleteMutation = useMutation({
     mutationFn: () => (kind === "taken" ? deleteTakenLoan(loan.id) : deleteGivenLoan(loan.id)),
     onSuccess: onRefresh,
@@ -576,6 +614,20 @@ function LoanRow({
       {expanded && (
         <View className="mt-4 gap-2 border-t border-app-border pt-3">
           <Detail label="Principal" value={formatMoney(loan.amount)} />
+          {kind === "given" && "borrowerName" in loan && (
+            <>
+              {loan.phoneNumber && <Detail label="Mobile" value={loan.phoneNumber} />}
+              <Pressable
+                accessibilityRole="button"
+                disabled={!loan.phoneNumber}
+                onPress={() => void openSmsComposer()}
+                className={`mt-2 h-11 flex-row items-center justify-center rounded-xl bg-app-muted ${!loan.phoneNumber ? "opacity-40" : ""}`}
+              >
+                <Text className="text-sm font-medium text-app-text">Send message</Text>
+              </Pressable>
+              <Text className="text-center text-xs text-app-subtle">Review and send in your messaging app.</Text>
+            </>
+          )}
           <Detail label="Interest" value={`${loan.interest}%`} />
           <Detail
             label="Paid"

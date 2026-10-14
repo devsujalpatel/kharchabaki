@@ -74,3 +74,5 @@ export const sessionManager = new SessionManager(
   offlineClient,
   transport,
 );
+export const exportFinanceArchive = () => offlineClient.exportFinanceArchive();
+export const restoreFinanceArchive = (value: unknown) => offlineClient.restoreFinanceArchive(value);

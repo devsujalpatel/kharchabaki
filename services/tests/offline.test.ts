@@ -630,6 +630,60 @@ test('device transactions, edits, dates, preferences and opening balance survive
   });
   assert.deepEqual([...f.calls, ...restored.calls], []);
 });
+test('offline document version 1 migrates without losing saved records', async () => {
+  const storage = new MemoryStorage();
+  storage.data.set('kharchabaki:local:v1:legacy', JSON.stringify({ version: 1, cache: {}, records: [], completeHistory: true, balance: 12, outbox: [], lastSyncedAt: null }));
+  const f = deviceFixture(storage);
+  await f.client.activate('legacy');
+  assert.equal((await data(f.client, '/balance')).balance, 12);
+  const saved = JSON.parse(storage.data.get('kharchabaki:local:v1:legacy')!);
+  assert.equal(saved.version, 2);
+  assert.deepEqual(saved.budgets, {});
+});
+
+test('device mode persists budgets, custom labels, and recurring schedules', async () => {
+  const f = deviceFixture();
+  await f.client.activate('local:features');
+  await f.client.request('/budgets', { method: 'POST', body: JSON.stringify({ month: '2026-10', category: 'pet-care', amount: 50, alertThreshold: 80 }) });
+  await f.client.request('/finance-labels', { method: 'POST', body: JSON.stringify({ kind: 'expense', key: 'pet-care', name: 'Pet care' }) });
+  await f.client.request('/recurring', { method: 'POST', body: JSON.stringify({ type: 'expense', amount: 15, category: 'pet-care', schedule: 'monthly', startAt: '2099-01-01T00:00:00.000Z' }) });
+  assert.equal(((await data(f.client, '/budgets?month=2026-10')) as unknown[]).length, 1);
+  assert.equal(((await data(f.client, '/finance-labels')) as unknown as unknown[]).length, 1);
+  assert.equal(((await data(f.client, '/recurring')) as unknown as unknown[]).length, 1);
+  const restored = deviceFixture(f.storage);
+  await restored.client.activate('local:features');
+  assert.equal(((await data(restored.client, '/finance-labels')) as unknown as unknown[]).length, 1);
+  assert.equal(((await data(restored.client, '/recurring')) as unknown as unknown[]).length, 1);
+});
+
+test('local recurring schedules generate due transactions only once', async () => {
+  const f = deviceFixture();
+  await f.client.activate('local:recurrence');
+  await f.client.request('/balance', { method: 'POST', body: JSON.stringify({ amount: 100 }) });
+  await f.client.request('/recurring', { method: 'POST', body: JSON.stringify({ type: 'expense', amount: 15, category: 'rent', schedule: 'monthly', startAt: '2020-01-31T00:00:00.000Z' }) });
+  await f.client.request('/recurring');
+  const schedules = (await data(f.client, '/recurring')) as Record<string, unknown>[];
+  assert.equal(new Date(String(schedules[0]?.nextRunAt)).getUTCDate(), 31);
+  const before = await rows(f.client);
+  assert.ok(before.length > 1);
+  const after = await rows(f.client, '/transactions');
+  assert.equal(after.length, before.length);
+  assert.ok((await data(f.client, '/balance')).balance < 100);
+});
+
+test('device archive export and restore round-trip without session data', async () => {
+  const f = deviceFixture();
+  await f.client.activate('local:archive');
+  await f.client.request('/balance', { method: 'POST', body: JSON.stringify({ amount: 100 }) });
+  await f.client.request('/loans/given', { method: 'POST', body: JSON.stringify({ amount: '20', borrowerName: 'Alex', phoneNumber: '+15551234567', dueDate: '2099-01-01' }) });
+  const archive = f.client.exportFinanceArchive();
+  assert.equal((archive.loans.given as Record<string, unknown>[])[0]?.phoneNumber, '+15551234567');
+  const restored = deviceFixture();
+  await restored.client.activate('local:restore');
+  await restored.client.restoreFinanceArchive(archive);
+  assert.equal((((await data(restored.client, '/loans/given'))[0] as Record<string, unknown>).phoneNumber), '+15551234567');
+});
+
 test('device borrowing, lending and interest repayments update balances and persist payment history', async () => {
   const f = deviceFixture();
   await f.client.activate('local:device');

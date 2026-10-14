@@ -22,7 +22,13 @@ function invalidateData(client: QueryClient, path?: string) {
   const keys =
     path === "/preferences"
       ? ["preferences"]
-      : path?.startsWith("/loans")
+      : path?.startsWith("/budgets")
+        ? ["budgets"]
+        : path?.startsWith("/finance-labels")
+          ? ["finance-labels"]
+          : path?.startsWith("/recurring")
+            ? ["recurring", "transactions", "balance", "dashboard-summary"]
+            : path?.startsWith("/loans")
         ? ["loans", "balance", "dashboard-summary"]
         : path?.startsWith("/income") ||
             path?.startsWith("/expense") ||
@@ -57,7 +63,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const accountChanged = sessionManager.onAccountChange(() => client.clear());
     offlineClient.setOnline(navigator.onLine);
-    void sessionManager.bootstrap();
+    void sessionManager.bootstrap().then(() => {
+      if (sessionManager.getSnapshot().data) void offlineClient.request("/recurring").catch(() => {});
+    });
     const expired = offlineClient.onUnauthorized(() => {
       void sessionManager.expire();
     });

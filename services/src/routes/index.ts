@@ -16,6 +16,9 @@ import { summaryRouter } from '../modules/summary/summary.route.js';
 import { loanRouter } from '../modules/loan/loan.route.js';
 
 import { preferencesRouter } from '../modules/preferences/preferences.route.js';
+import { financeLabelsRouter } from '../modules/finance-labels/finance-labels.route.js';
+import { budgetsRouter } from '../modules/budgets/budgets.route.js';
+import { recurringRouter } from '../modules/recurring/recurring.route.js';
 
 export const apiRouter = Router();
 
@@ -49,3 +52,6 @@ apiRouter.use(expenseRouter);
 apiRouter.use(summaryRouter);
 apiRouter.use(loanRouter);
 apiRouter.use(preferencesRouter);
+apiRouter.use(financeLabelsRouter);
+apiRouter.use(budgetsRouter);
+apiRouter.use(recurringRouter);

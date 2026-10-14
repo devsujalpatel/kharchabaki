@@ -45,6 +45,7 @@ import {
   type TransactionFilters,
 } from "@/services/transactions";
 import { CategoryPicker } from "@/components/CategoryPicker";
+import { getLabels } from "@/lib/finance-features";
 import { MonthPicker } from "@/components/MonthPicker";
 import { TransactionEditor } from "@/components/TransactionEditor";
 
@@ -105,6 +106,7 @@ export default function Transactions() {
     queryFn: () =>
       transactionsQuery({ month: month || undefined, type, category, search: deferredSearch }),
   });
+  const labels = useQuery({ queryKey: ["finance-labels"], queryFn: getLabels });
   const deletion = useMutation({
     mutationFn: deleteTransaction,
     onSuccess: async () => {
@@ -115,15 +117,14 @@ export default function Transactions() {
       );
     },
   });
-  const options = useMemo(
-    () =>
-      type === "income"
-        ? incomeSources
-        : type === "expense"
-          ? expenseCategories
-          : [...new Set([...expenseCategories, ...incomeSources])],
-    [type]
-  );
+  const options = useMemo(() => {
+    const custom = (labels.data?.data ?? []).filter((item) => item.active);
+    return type === "income"
+      ? [...incomeSources, ...custom.filter((item) => item.kind === "income").map((item) => item.key)]
+      : type === "expense"
+        ? [...expenseCategories, ...custom.filter((item) => item.kind === "expense").map((item) => item.key)]
+        : [...new Set([...expenseCategories, ...incomeSources, ...custom.map((item) => item.key)])];
+  }, [type, labels.data?.data]);
   const groups = useMemo(() => {
     const byDate = new Map<string, Transaction[]>();
     const sorted = [...(query.data?.data ?? [])].sort((a, b) =>

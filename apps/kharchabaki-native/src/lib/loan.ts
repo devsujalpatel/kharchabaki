@@ -30,6 +30,7 @@ export type GivenLoan = {
   totalAmount: string;
   interest: string;
   borrowerName: string;
+  phoneNumber: string | null;
   dueDate: string;
   status: LoanStatus;
   createdAt: string;
@@ -91,6 +92,7 @@ export async function createTakenLoan(
 export async function createGivenLoan(
   data: CreateLoanInput & {
     borrowerName: string;
+    phoneNumber?: string;
   }
 ): Promise<ApiResponse<GivenLoan>> {
   const response = await api("/api/v1/loans/given", {
@@ -124,7 +126,7 @@ export async function updateTakenLoan(
 
 export async function updateGivenLoan(
   loanId: string,
-  data: CreateLoanInput & { borrowerName: string }
+  data: CreateLoanInput & { borrowerName: string; phoneNumber?: string }
 ): Promise<ApiResponse<GivenLoan>> {
   const response = await api(`/api/v1/loans/given/${loanId}`, {
     method: "PATCH",

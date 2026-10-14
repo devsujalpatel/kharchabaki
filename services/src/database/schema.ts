@@ -8,6 +8,7 @@ import {
   decimal,
   pgEnum,
   uuid,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
@@ -93,66 +94,121 @@ export const verification = pgTable(
   (table) => [index('verification_identifier_idx').on(table.identifier)],
 );
 
-// ExpenseEnum
-export const expenseCategoryEnum = pgEnum('expense_category', [
-  'food',
-  'travel',
-  'shopping',
-  'bills',
-  'rent',
-  'phone',
-  'beauty',
-  'clothing',
-  'fuel',
-  'gifts',
-  'electronics',
-  'snacks',
-  'drinks',
-  'vegetables',
-  'fruits',
-  'repairs',
-  'health',
-  'education',
-  'entertainment',
-  'groceries',
-  'transport',
-  'insurance',
-  'subscriptions',
-  'fitness',
-  'pets',
-  'childcare',
-  'donations',
-  'taxes',
-  'other',
-]);
-
-// IcomeSourceEnum
-export const incomeSourceEnum = pgEnum('income_source', [
-  'salary',
-  'pocket-money',
-  'gift',
-  'invesment',
-  'bonues',
-  'part-time',
-  'investment',
-  'bonus',
-  'freelance',
-  'business',
-  'rental',
-  'interest',
-  'dividends',
-  'refund',
-  'pension',
-  'sale',
-  'other',
-]);
-
 // LoanStatusEnum
 export const loanStatusEnum = pgEnum('loan_status', [
   'active',
   'paid',
   'overdue',
 ]);
+
+export const financeLabel = pgTable(
+  'finance_label',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    key: text('key').notNull(),
+    name: text('name').notNull(),
+    active: boolean('active').default(true).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('finance_label_user_kind_key_idx').on(
+      table.userId,
+      table.kind,
+      table.key,
+    ),
+    index('finance_label_user_kind_idx').on(table.userId, table.kind),
+  ],
+);
+
+export const budget = pgTable(
+  'budget',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    month: text('month').notNull(),
+    category: text('category').notNull(),
+    amount: decimal('amount', { precision: 19, scale: 2 }).notNull(),
+    alertThreshold: decimal('alert_threshold', { precision: 5, scale: 2 })
+      .default('80.00')
+      .notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex('budget_user_month_category_idx').on(
+      table.userId,
+      table.month,
+      table.category,
+    ),
+    index('budget_user_month_idx').on(table.userId, table.month),
+  ],
+);
+
+export const recurringTransaction = pgTable(
+  'recurring_transaction',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    amount: decimal('amount', { precision: 19, scale: 2 }).notNull(),
+    category: text('category'),
+    description: text('description'),
+    schedule: text('schedule').notNull(),
+    interval: decimal('interval', { precision: 5, scale: 0 }).default('1').notNull(),
+    dayOfMonth: decimal('day_of_month', { precision: 2, scale: 0 }),
+    startAt: timestamp('start_at').notNull(),
+    nextRunAt: timestamp('next_run_at').notNull(),
+    endAt: timestamp('end_at'),
+    timezone: text('timezone').default('UTC').notNull(),
+    enabled: boolean('enabled').default(true).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index('recurring_transaction_user_next_run_idx').on(
+      table.userId,
+      table.enabled,
+      table.nextRunAt,
+    ),
+  ],
+);
+
+export const recurringOccurrence = pgTable(
+  'recurring_occurrence',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    recurringTransactionId: uuid('recurring_transaction_id')
+      .notNull()
+      .references(() => recurringTransaction.id, { onDelete: 'cascade' }),
+    scheduledFor: timestamp('scheduled_for').notNull(),
+    transactionId: uuid('transaction_id').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('recurring_occurrence_schedule_idx').on(
+      table.recurringTransactionId,
+      table.scheduledFor,
+    ),
+    uniqueIndex('recurring_occurrence_transaction_idx').on(table.transactionId),
+  ],
+);
 
 // Inome
 export const income = pgTable(
@@ -168,7 +224,7 @@ export const income = pgTable(
       precision: 19,
       scale: 2,
     }).notNull(),
-    source: incomeSourceEnum('source').notNull(),
+    source: text('source').notNull(),
     description: text('description'),
     receivedAt: timestamp('received_at').defaultNow().notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -196,7 +252,7 @@ export const expense = pgTable(
       precision: 19,
       scale: 2,
     }).notNull(),
-    category: expenseCategoryEnum('category').notNull(),
+    category: text('category').notNull(),
     description: text('description'),
     spentAt: timestamp('spent_at').defaultNow().notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -296,6 +352,7 @@ export const givenLoan = pgTable(
       .default('0.00')
       .notNull(),
     borrowerName: text('borrower_name').notNull(),
+    phoneNumber: text('phone_number'),
     status: loanStatusEnum('status').default('active').notNull(),
     dueDate: timestamp('due_date').notNull(),
     interest: decimal('interest', {

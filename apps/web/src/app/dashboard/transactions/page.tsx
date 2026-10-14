@@ -3,6 +3,8 @@
 import { useState } from "react";
 import {
   CloudUpload,
+  Download,
+  Upload,
   Loader2,
   Pencil,
   Receipt,
@@ -33,10 +35,14 @@ import { TransactionEditor } from "@/components/transaction-editor";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getLabels } from "@/server/finance-features";
+import { downloadArchive, downloadCsv, importCsv, restoreArchive } from "./portability";
 
 export default function Transactions() {
   const { formatMoney } = usePreferences();
   const client = useQueryClient();
+  const labelQuery = useQuery({ queryKey: ["finance-labels"], queryFn: getLabels });
+  const customLabels = (labelQuery.data?.data ?? []).filter((item) => item.active).map((item) => item.key);
   const [month, setMonth] = useState(currentMonth);
   const [type, setType] = useState<TransactionFilters["type"]>("all");
   const [category, setCategory] = useState("all");
@@ -44,6 +50,11 @@ export default function Transactions() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [removing, setRemoving] = useState<Transaction | null>(null);
+  const [importError, setImportError] = useState("");
+  const allTransactions = useQuery({
+    queryKey: ["transactions", "all-export"],
+    queryFn: () => transactionsQuery({ type: "all", category: "all", search: "" }),
+  });
   const query = useQuery({
     queryKey: ["transactions", month, type, category, search],
     queryFn: () =>
@@ -62,10 +73,10 @@ export default function Transactions() {
   });
   const options =
     type === "income"
-      ? incomeSources
+      ? [...incomeSources, ...customLabels.filter((key) => labelQuery.data?.data.some((item) => item.kind === "income" && item.key === key))]
       : type === "expense"
-        ? expenseCategories
-        : [...new Set([...expenseCategories, ...incomeSources])];
+        ? [...expenseCategories, ...customLabels.filter((key) => labelQuery.data?.data.some((item) => item.kind === "expense" && item.key === key))]
+        : [...new Set([...expenseCategories, ...incomeSources, ...customLabels])];
   const transactions = [...(query.data?.data ?? [])].sort((a, b) =>
     b.occurredAt.localeCompare(a.occurredAt),
   );
@@ -76,7 +87,8 @@ export default function Transactions() {
   }
   return (
     <div className="space-y-5 pb-24">
-      <h1 className="text-2xl font-semibold tracking-tight">Transactions</h1>
+      <div className="flex items-center justify-between gap-3"><h1 className="text-2xl font-semibold tracking-tight">Transactions</h1><div className="flex gap-2"><Button variant="outline" size="icon" aria-label="Export transactions CSV" title="Export CSV" onClick={() => downloadCsv(allTransactions.data?.data ?? [])}><Download className="size-4"/></Button><label className="inline-flex size-10 cursor-pointer items-center justify-center rounded-xl border" aria-label="Import transactions CSV"><Upload className="size-4"/><input className="sr-only" type="file" accept=".csv,text/csv" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importCsv(file, setImportError, client); event.currentTarget.value = ""; }}/></label><Button variant="outline" size="icon" aria-label="Export finance backup" title="Export backup" onClick={() => downloadArchive()}><Download className="size-4"/></Button><label className="inline-flex size-10 cursor-pointer items-center justify-center rounded-xl border" aria-label="Restore finance backup"><Upload className="size-4"/><input className="sr-only" type="file" accept=".json,application/json" onChange={(event) => { const file = event.target.files?.[0]; if (file) void restoreArchive(file, setImportError, client); event.currentTarget.value = ""; }}/></label></div></div>
+      {importError && <p role="alert" className="text-sm text-destructive">{importError}</p>}
       <MonthPicker month={month} onChange={setMonth} allowAll />
       <div className="flex items-center gap-2">
         <div className="relative min-w-0 flex-1">

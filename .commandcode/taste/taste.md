@@ -1,3 +1,4 @@
 - Prefers uncluttered, task-focused interfaces with progressive disclosure: show category/source options only when the corresponding add flow is opened, and keep secondary status information out of general screens. Confidence: 0.95
 - Prefers a concise home screen with compact, non-duplicated month navigation; put detailed charts and expense/income breakdowns in a dedicated analytics view rather than on Home. Confidence: 0.95
+- Prefers messaging actions to open the device’s default messaging app with a generic message prefilled, leaving review and sending under the user’s control rather than sending automatically. Confidence: 0.9
 - Values clear, user-friendly loan interfaces. Confidence: 0.8

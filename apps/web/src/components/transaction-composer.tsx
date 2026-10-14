@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getLabels } from "@/server/finance-features";
 import { ArrowDown, ArrowUp, Check, Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -31,6 +33,9 @@ export function TransactionComposer({
   const [description, setDescription] = useState("");
   const [validation, setValidation] = useState("");
   const isIncome = type === "income";
+  const labels = useQuery({ queryKey: ["finance-labels"], queryFn: getLabels });
+  const customOptions = (labels.data?.data ?? []).filter((item) => item.active && item.kind === type).map((item) => item.key);
+  const options = [...new Set([...(isIncome ? incomeSources : expenseCategories), ...customOptions])];
   const mutation = useMutation({
     mutationFn: () => {
       const data = {
@@ -87,7 +92,7 @@ export function TransactionComposer({
             />
           </label>
           <CategoryPicker
-            options={isIncome ? incomeSources : expenseCategories}
+            options={options}
             value={category}
             onChange={(value) => {
               setCategory(value);

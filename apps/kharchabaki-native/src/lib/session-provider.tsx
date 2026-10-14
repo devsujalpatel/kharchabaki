@@ -46,7 +46,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const accountChanged = sessionManager.onAccountChange(() => client.clear());
     // Restore device data immediately; connectivity does not block the first screen.
-    void sessionManager.bootstrap();
+    void sessionManager.bootstrap().then(() => {
+      if (sessionManager.getSnapshot().data) void offlineClient.request("/recurring").catch(() => {});
+    });
     const expired = offlineClient.onUnauthorized(() => {
       void sessionManager.expire();
     });

@@ -291,6 +291,7 @@ function LoanComposer({
   const [form, setForm] = useState({
     amount: loan?.amount ?? "",
     person: loan ? ("borrowedFrom" in loan ? loan.borrowedFrom : loan.borrowerName) : "",
+    phoneNumber: loan && "borrowerName" in loan ? loan.phoneNumber ?? "" : "",
     dueDate: loan?.dueDate.slice(0, 10) ?? "",
     interest: loan?.interest ?? "0.00",
   });
@@ -316,12 +317,14 @@ function LoanComposer({
             ? updateGivenLoan(loan.id, {
                 amount: form.amount,
                 borrowerName: form.person.trim(),
+                phoneNumber: form.phoneNumber.trim() || undefined,
                 dueDate: form.dueDate,
                 interest: form.interest,
               })
             : createGivenLoan({
                 amount: form.amount,
                 borrowerName: form.person.trim(),
+                phoneNumber: form.phoneNumber.trim() || undefined,
                 dueDate: form.dueDate,
                 interest: form.interest,
               })
@@ -383,6 +386,19 @@ function LoanComposer({
               className="h-11 rounded-xl"
             />
           </label>
+          {kind === "given" && (
+            <label className="block space-y-2">
+              <span className="text-sm font-medium">Mobile number (optional)</span>
+              <Input
+                type="tel"
+                maxLength={30}
+                value={form.phoneNumber}
+                onChange={(event) => setForm({ ...form, phoneNumber: event.target.value })}
+                placeholder="+91 98765 43210"
+                className="h-11 rounded-xl"
+              />
+            </label>
+          )}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block min-w-0 space-y-2">
               <span className="text-sm font-medium">Due date</span>

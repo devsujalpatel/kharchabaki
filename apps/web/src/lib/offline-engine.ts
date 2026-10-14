@@ -33,13 +33,17 @@ export type PendingChange = {
   error?: string;
 };
 type Document = {
-  version: 1;
+  version: 2;
   cache: Record<string, Envelope>;
   records: SavedTransaction[];
   completeHistory: boolean;
   balance: number | null;
   outbox: PendingChange[];
   lastSyncedAt: number | null;
+  budgets: Record<string, Record<string, unknown>[]>;
+  recurring: Record<string, Record<string, unknown>[]>;
+  labels: Record<string, Record<string, unknown>[]>;
+  alertedBudgets: string[];
 };
 export type OfflineStatus = {
   ready: boolean;
@@ -66,13 +70,17 @@ export function asObject(value: unknown): Record<string, unknown> {
 }
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const emptyDocument = (): Document => ({
-  version: 1,
+  version: 2,
   cache: {},
   records: [],
   completeHistory: false,
   balance: null,
   outbox: [],
   lastSyncedAt: null,
+  budgets: {},
+  recurring: {},
+  labels: {},
+  alertedBudgets: [],
 });
 const localDocument = (): Document => ({
   ...emptyDocument(),
@@ -91,10 +99,10 @@ const localDocument = (): Document => ({
 const dataKey = (account: string, syncEnabled: boolean) =>
   `kharchabaki:${syncEnabled ? "data" : "local"}:v1:${account}`;
 function readDocument(saved: string): Document {
-  const document = JSON.parse(saved) as Document;
+  const document = JSON.parse(saved) as Partial<Document> & { version?: number };
   if (
     !document ||
-    document.version !== 1 ||
+    ![1, 2].includes(document.version ?? 0) ||
     !Array.isArray(document.outbox) ||
     !Array.isArray(document.records) ||
     !document.cache ||
@@ -106,7 +114,14 @@ function readDocument(saved: string): Document {
         !Number.isFinite(document.balance)))
   )
     throw new Error("Saved data could not be read. Please retry.");
-  return document;
+  return {
+    ...document,
+    version: 2,
+    budgets: document.budgets ?? {},
+    recurring: document.recurring ?? {},
+    labels: document.labels ?? {},
+    alertedBudgets: document.alertedBudgets ?? [],
+  } as Document;
 }
 function seedLocalDocument(cloud: Document): Document {
   const local = localDocument();
@@ -397,6 +412,71 @@ export class OfflineClient {
   getSnapshot = () => this.snapshot;
   getPending = () => this.document.outbox;
   getAccount = () => this.account;
+  exportFinanceArchive = () => {
+    if (!this.snapshot.ready) throw new ApiError(0, "Finance data is not ready yet.");
+    if (this.snapshot.syncEnabled) throw new ApiError(400, "Full backup is available from a device-only workspace. Export transactions as CSV from cloud mode.");
+    return {
+      format: "kharchabaki-finance",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      records: clone(this.document.records),
+      balance: this.document.balance,
+      loans: {
+        taken: clone(Array.isArray(this.document.cache["/loans/taken"]?.data) ? this.document.cache["/loans/taken"]!.data : []),
+        given: clone(Array.isArray(this.document.cache["/loans/given"]?.data) ? this.document.cache["/loans/given"]!.data : []),
+      },
+      budgets: clone(this.document.budgets),
+      recurring: clone(this.document.recurring),
+      labels: clone(this.document.labels),
+      preferences: clone(asObject(this.document.cache["/preferences"]?.data)),
+    };
+  };
+  async restoreFinanceArchive(value: unknown) {
+    if (!this.account || !this.snapshot.ready) throw new ApiError(401, "Please sign in to continue.");
+    if (this.snapshot.syncEnabled) throw new ApiError(400, "Restore is available from a device-only workspace. Cloud bulk restore is not enabled.");
+    const archive = asObject(value);
+    if (archive.format !== "kharchabaki-finance" || archive.version !== 1 || !Array.isArray(archive.records))
+      throw new ApiError(400, "This is not a supported Kharchabaki backup.");
+    const records = archive.records.map(asObject);
+    if (records.some((row) => !["income", "expense"].includes(String(row.type)) || !row.id || validateAmount(row.amount) <= 0 || !Number.isFinite(new Date(String(row.occurredAt)).getTime())))
+      throw new ApiError(400, "The backup contains an invalid transaction.");
+    const loans = asObject(archive.loans);
+    if (!Array.isArray(loans.taken) || !Array.isArray(loans.given))
+      throw new ApiError(400, "The backup contains invalid loan data.");
+    const taken = loans.taken.map(asObject);
+    const given = loans.given.map(asObject);
+    const validLoans = (values: Record<string, unknown>[]) => values.every((loan) => {
+      const payments = Array.isArray(loan.payments) ? loan.payments.map(asObject) : [];
+      return typeof loan.id === "string" && Number.isFinite(validateAmount(loan.amount)) &&
+        Number.isFinite(validateAmount(loan.totalAmount)) && Number.isFinite(validateAmount(loan.paidAmount, true)) &&
+        Number.isFinite(new Date(String(loan.dueDate)).getTime()) && payments.every((payment) =>
+          payment.loanId === loan.id && Number.isFinite(validateAmount(payment.amount)) && Number.isFinite(new Date(String(payment.paidAt)).getTime()),
+        ) && (!loan.phoneNumber || (typeof loan.phoneNumber === "string" && loan.phoneNumber.length <= 30));
+    });
+    if (!validLoans(taken) || !validLoans(given)) throw new ApiError(400, "The backup contains an invalid loan or payment.");
+    const budgets = asObject(archive.budgets) as Record<string, Record<string, unknown>[]>;
+    if (Object.entries(budgets).some(([month, rows]) => !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !Array.isArray(rows) || rows.some((row) => !row.id || !row.category || !Number.isFinite(validateAmount(row.amount)))))
+      throw new ApiError(400, "The backup contains invalid budget data.");
+    const recurring = asObject(archive.recurring) as Record<string, Record<string, unknown>[]>;
+    if (Object.values(recurring).flat().some((row) => !row.id || !["income", "expense"].includes(String(row.type)) || !["daily", "weekly", "monthly", "yearly"].includes(String(row.schedule)) || !Number.isFinite(validateAmount(row.amount))))
+      throw new ApiError(400, "The backup contains invalid recurring data.");
+    const next = {
+      ...emptyDocument(),
+      completeHistory: true,
+      balance: Number.isFinite(Number(archive.balance)) ? Number(archive.balance) : 0,
+      records: clone(records) as unknown as SavedTransaction[],
+      budgets: asObject(archive.budgets) as Record<string, Record<string, unknown>[]>,
+      recurring: asObject(archive.recurring) as Record<string, Record<string, unknown>[]>,
+      labels: asObject(archive.labels) as Record<string, Record<string, unknown>[]>,
+      cache: {
+        "/preferences": { success: true, message: "Restored preferences", data: asObject(archive.preferences) },
+        "/loans/taken": { success: true, message: "Restored loans", data: taken },
+        "/loans/given": { success: true, message: "Restored loans", data: given },
+      },
+    };
+    await this.exclusive(async () => this.persist(next));
+    this.dataListeners.forEach((listener) => listener());
+  }
   getCachedPreferences = (): Record<string, unknown> | null => {
     if (!this.snapshot.ready || !this.document.cache["/preferences"])
       return null;
@@ -499,7 +579,12 @@ export class OfflineClient {
       this.assertCurrent(account, generation);
       const saved = await this.storage.getItem(dataKey(account, syncEnabled));
       this.assertCurrent(account, generation);
-      if (saved !== null) return readDocument(saved);
+      if (saved !== null) {
+        const document = readDocument(saved);
+        if ((JSON.parse(saved) as { version?: number }).version !== 2)
+          await this.storage.setItem(dataKey(account, syncEnabled), JSON.stringify(document));
+        return document;
+      }
       if (syncEnabled) return emptyDocument();
       // Migrate only this account's existing device cache once. Its cloud outbox remains untouched.
       const cloud = await this.storage.getItem(dataKey(account, true));
@@ -556,6 +641,43 @@ export class OfflineClient {
     const url = new URL(key, "https://local.invalid");
     const saved = this.document.cache[key];
     const projected = project(this.document);
+    if (url.pathname === "/finance-labels") {
+      const rows = Object.values(this.document.labels).flat();
+      const projected = this.document.outbox.filter((change) => change.path.startsWith("/finance-labels")).reduce((items, change) => {
+        const id = String(change.body.id ?? change.path.split("/")[2] ?? "");
+        return change.method === "DELETE" ? items.map((item) => item.id === id ? { ...item, active: false } : item) : [...items.filter((item) => item.id !== id), { ...change.body, id }];
+      }, rows);
+      return { success: true, message: "Saved finance labels", data: projected, offline: true };
+    }
+    if (url.pathname === "/budgets") {
+      const month = url.searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
+      const budgets = this.document.outbox.filter((change) => change.path.startsWith("/budgets")).reduce((items, change) => {
+        const id = String(change.body.id ?? change.path.split("/")[2] ?? "");
+        if (change.method === "DELETE") return Object.values(this.document.budgets).flat().filter((item) => item.id !== id);
+        const value: Record<string, unknown> = { ...change.body, id };
+        return [...items.filter((item) => !(item.id === id || (item.month === value.month && item.category === value.category))), value];
+      }, this.document.budgets[month] ?? []);
+      return {
+        success: true,
+        message: "Saved budgets",
+        data: budgets.filter((item) => item.month === month).map((item) => {
+          const amount = Number(item.amount);
+          const spent = projected.records
+            .filter((row) => row.type === "expense" && row.category === item.category && row.occurredAt.startsWith(month))
+            .reduce((total, row) => total + Number(row.amount), 0);
+          return { ...item, spent: spent.toFixed(2), remaining: (amount - spent).toFixed(2), progress: amount ? (spent / amount) * 100 : 0 };
+        }),
+        offline: true,
+      };
+    }
+    if (url.pathname === "/recurring") {
+      const rows = Object.values(this.document.recurring).flat();
+      const data = this.document.outbox.filter((change) => change.path.startsWith("/recurring")).reduce((items, change) => {
+        const id = String(change.body.id ?? change.path.split("/")[2] ?? "");
+        return change.method === "DELETE" ? items.filter((item) => item.id !== id) : [...items.filter((item) => item.id !== id), { ...change.body, id }];
+      }, rows);
+      return { success: true, message: "Saved recurring transactions", data, offline: true };
+    }
     if (
       (url.pathname === "/income" || url.pathname === "/expense") &&
       this.document.completeHistory
@@ -750,6 +872,8 @@ export class OfflineClient {
     path: string,
     init: RequestInit = {},
   ): Promise<T> {
+    if (path.startsWith("/recurring") && (init.method ?? "GET").toUpperCase() === "GET" && this.snapshot.ready && !this.snapshot.syncEnabled)
+      await this.generateLocalOccurrences();
     if (!this.account || !this.snapshot.ready)
       throw new ApiError(401, "Please sign in to continue.");
     const key = keyFor(path);
@@ -847,7 +971,9 @@ export class OfflineClient {
       (method === "POST" && /^\/(income|expense)$/.test(path)) ||
       (["PATCH", "DELETE"].includes(method) &&
         /^\/(income|expense)\/[\w-]+$/.test(path)) ||
-      (method === "PATCH" && path === "/preferences");
+      (method === "PATCH" && path === "/preferences") ||
+      (method === "POST" && ["/budgets", "/finance-labels", "/recurring"].includes(path)) ||
+      (["PATCH", "DELETE"].includes(method) && /^\/(budgets|finance-labels|recurring)\/[\w-]+$/.test(path));
     if (!supported) {
       if (!this.snapshot.online || this.document.outbox.length)
         throw new ApiError(
@@ -883,7 +1009,7 @@ export class OfflineClient {
       return result;
     }
     const body = init.body ? asObject(JSON.parse(String(init.body))) : {};
-    if (method !== "DELETE" && path !== "/preferences") {
+    if (method !== "DELETE" && /^\/(income|expense)(?:\/|$)/.test(path)) {
       const amount = Number(body.amount);
       if (
         !Number.isFinite(amount) ||
@@ -900,8 +1026,10 @@ export class OfflineClient {
     }
     if (method === "POST") {
       body.id ??= this.uuid();
-      body.occurredAt ??= new Date().toISOString();
+      if (/^\/(income|expense)$/.test(path)) body.occurredAt ??= new Date().toISOString();
     }
+    if (method === "POST" && ["/budgets", "/finance-labels", "/recurring"].includes(path))
+      body.id ??= this.uuid();
     const change: PendingChange = {
       id: this.uuid(),
       path,
@@ -995,6 +1123,67 @@ export class OfflineClient {
           : { id: body.id ?? path.split("/")[2], ...body },
     };
   }
+  private async generateLocalOccurrences() {
+    await this.exclusive(async () => {
+      const next = clone(this.document);
+      const templates = Object.values(next.recurring).flat();
+      const now = Date.now();
+      let changed = false;
+      for (const template of templates) {
+        if (template.enabled === false) continue;
+        let dueDate = new Date(String(template.nextRunAt ?? template.startAt));
+        if (!Number.isFinite(dueDate.getTime())) continue;
+        while (dueDate.getTime() <= now && (!template.endAt || dueDate.getTime() <= new Date(String(template.endAt)).getTime())) {
+          const due = new Date(dueDate);
+          const scheduled = new Date(Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate()));
+          const seed = `${template.id}:${scheduled.toISOString().slice(0, 10)}`;
+          let hash = 2166136261;
+          for (let index = 0; index < seed.length; index++) hash = Math.imul(hash ^ seed.charCodeAt(index), 16777619);
+          const hex = (hash >>> 0).toString(16).padStart(8, "0").repeat(4).slice(0, 32);
+          const id = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20)}`;
+          if (!next.records.some((row) => row.id === id)) {
+            const amount = validateAmount(template.amount);
+            const type = String(template.type);
+            if (type === "expense" && toCents(next.balance) < amount) {
+              template.enabled = false;
+              break;
+            }
+            const transaction: SavedTransaction = {
+              id,
+              type: type === "income" ? "income" : "expense",
+              amount: (amount / 100).toFixed(2),
+              source: type === "income" ? String(template.category) : null,
+              category: type === "expense" ? String(template.category) : null,
+              description: typeof template.description === "string" ? template.description : null,
+              createdAt: new Date().toISOString(),
+              occurredAt: scheduled.toISOString(),
+            };
+            next.records.push(transaction);
+            next.balance = ((toCents(next.balance) + (type === "income" ? amount : -amount)) / 100);
+            changed = true;
+          }
+          const interval = Math.max(1, Number(template.interval ?? 1));
+          const nextDate = new Date(due);
+          if (template.schedule === "daily") nextDate.setUTCDate(nextDate.getUTCDate() + interval);
+          else if (template.schedule === "weekly") nextDate.setUTCDate(nextDate.getUTCDate() + 7 * interval);
+          else if (template.schedule === "yearly") nextDate.setUTCFullYear(nextDate.getUTCFullYear() + interval);
+          else {
+            const day = Number(template.dayOfMonth) || new Date(String(template.startAt)).getUTCDate();
+            nextDate.setUTCDate(1);
+            nextDate.setUTCMonth(nextDate.getUTCMonth() + interval);
+            nextDate.setUTCDate(Math.min(day, new Date(Date.UTC(nextDate.getUTCFullYear(), nextDate.getUTCMonth() + 1, 0)).getUTCDate()));
+          }
+          dueDate = nextDate;
+          template.nextRunAt = nextDate.toISOString();
+          changed = true;
+        }
+      }
+      if (changed) {
+        next.recurring = { all: templates };
+        await this.persist(next);
+      }
+    });
+  }
   private async writeLocal(
     path: string,
     method: string,
@@ -1011,6 +1200,9 @@ export class OfflineClient {
       const transaction = /^\/(income|expense)(?:\/([\w-]+))?$/.exec(path);
       const loanCreate = /^\/loans\/(taken|given)$/.exec(path);
       const loanMutation = /^\/loans\/(taken|given)\/([\w-]+)$/.exec(path);
+      const budgetMutation = /^\/budgets(?:\/([\w-]+))?$/.exec(path);
+      const recurringMutation = /^\/recurring(?:\/([\w-]+))?$/.exec(path);
+      const labelMutation = /^\/finance-labels(?:\/([\w-]+))?$/.exec(path);
       const loanPayment = /^\/loans\/(taken|given)\/([\w-]+)\/payments$/.exec(
         path,
       );
@@ -1030,11 +1222,12 @@ export class OfflineClient {
         const input: Record<string, unknown> = { ...body, id };
         if (method !== "DELETE") {
           validateAmount(input.amount);
-          if (
-            !(type === "income" ? sources : categories).has(
-              String(type === "income" ? input.source : input.category),
-            )
-          )
+          const labelKey = String(type === "income" ? input.source : input.category);
+          const labelKind = type === "income" ? "income" : "expense";
+          const customLabel = Object.values(next.labels).flat().some(
+            (item) => item.kind === labelKind && item.key === labelKey && item.active !== false,
+          );
+          if (!(type === "income" ? sources : categories).has(labelKey) && !customLabel)
             throw new ApiError(400, "Choose a source or category.");
           if (
             input.description !== undefined &&
@@ -1079,6 +1272,58 @@ export class OfflineClient {
       } else if (path === "/balance" && method === "POST") {
         next.balance = validateAmount(body.amount, true) / 100;
         data = { balance: next.balance };
+      } else if (budgetMutation && (method === "POST" || method === "DELETE")) {
+        const month = String(body.month ?? new Date().toISOString().slice(0, 7));
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new ApiError(400, "Choose a valid month.");
+        const items = next.budgets[month] ?? [];
+        if (method === "DELETE") {
+          const id = budgetMutation[1] ?? String(body.id ?? "");
+          next.budgets[month] = items.filter((item) => item.id !== id);
+          data = { id };
+        } else {
+          const amount = validateAmount(body.amount);
+          const category = String(body.category ?? "").trim();
+          const threshold = Number(body.alertThreshold ?? 80);
+          if (!category || category.length > 100 || !Number.isFinite(threshold) || threshold < 1 || threshold > 100)
+            throw new ApiError(400, "Choose a category and alert threshold from 1 to 100.");
+          const existing = items.find((item) => item.category === category);
+          const budgetRow = { id: String(body.id ?? existing?.id ?? this.uuid()), month, category, amount: (amount / 100).toFixed(2), alertThreshold: threshold.toFixed(2) };
+          next.budgets[month] = [...items.filter((item) => item.category !== category), budgetRow];
+          data = budgetRow;
+        }
+      } else if (recurringMutation && (method === "POST" || method === "PATCH" || method === "DELETE")) {
+        const rows = Object.values(next.recurring).flat();
+        const id = recurringMutation[1] ?? String(body.id ?? this.uuid());
+        if (method === "DELETE") {
+          next.recurring = { all: rows.filter((item) => item.id !== id) };
+          data = { id };
+        } else {
+          const amount = validateAmount(body.amount);
+          const type = String(body.type);
+          const schedule = String(body.schedule);
+          const startAt = new Date(String(body.startAt ?? createdAt));
+          if (!["income", "expense"].includes(type) || !["daily", "weekly", "monthly", "yearly"].includes(schedule) || !Number.isFinite(startAt.getTime()))
+            throw new ApiError(400, "Choose a valid recurring transaction schedule.");
+          const row = { ...rows.find((item) => item.id === id), ...body, id, amount: (amount / 100).toFixed(2), startAt: startAt.toISOString(), dayOfMonth: body.dayOfMonth ?? startAt.getUTCDate(), nextRunAt: String(body.nextRunAt ?? startAt.toISOString()), enabled: body.enabled !== false };
+          next.recurring = { all: [...rows.filter((item) => item.id !== id), row] };
+          data = row;
+        }
+      } else if (labelMutation && (method === "POST" || method === "PATCH" || method === "DELETE")) {
+        const rows = Object.values(next.labels).flat();
+        const id = labelMutation[1] ?? String(body.id ?? this.uuid());
+        if (method === "DELETE") {
+          next.labels = { all: rows.map((item) => item.id === id ? { ...item, active: false } : item) };
+          data = { id };
+        } else {
+          const kind = String(body.kind ?? rows.find((item) => item.id === id)?.kind);
+          const key = String(body.key ?? rows.find((item) => item.id === id)?.key).trim();
+          const name = String(body.name ?? rows.find((item) => item.id === id)?.name).trim();
+          if (!["income", "expense"].includes(kind) || !key || key.length > 100 || !name || name.length > 60)
+            throw new ApiError(400, "Choose a label type, key, and name.");
+          const row = { id, kind, key, name, active: body.active !== false };
+          next.labels = { all: [...rows.filter((item) => item.id !== id), row] };
+          data = row;
+        }
       } else if (loanCreate && method === "POST") {
         const kind = loanCreate[1];
         const amount = validateAmount(body.amount);
@@ -1093,6 +1338,8 @@ export class OfflineClient {
             400,
             "Enter a person or bank name under 100 characters.",
           );
+        const phoneNumber = kind === "given" ? String(body.phoneNumber ?? "").trim() : "";
+        if (phoneNumber.length > 30) throw new ApiError(400, "Keep the mobile number under 30 characters.");
         const dueDate = new Date(String(body.dueDate));
         if (!Number.isFinite(dueDate.getTime()))
           throw new ApiError(400, "Choose a valid due date.");
@@ -1108,6 +1355,7 @@ export class OfflineClient {
           paidAmount: "0.00",
           interest: (interest / 100).toFixed(2),
           [personKey]: person,
+          ...(kind === "given" ? { phoneNumber: phoneNumber || null } : {}),
           dueDate: dueDate.toISOString(),
           status: dueDate.getTime() < Date.now() ? "overdue" : "active",
           createdAt,
@@ -1162,6 +1410,8 @@ export class OfflineClient {
           const dueDate = new Date(String(body.dueDate));
           if (!Number.isFinite(dueDate.getTime()))
             throw new ApiError(400, "Choose a valid due date.");
+          const phoneNumber = kind === "given" ? String(body.phoneNumber ?? loan.phoneNumber ?? "").trim() : "";
+          if (phoneNumber.length > 30) throw new ApiError(400, "Keep the mobile number under 30 characters.");
           const total = Math.round((amount * (10000 + interest)) / 10000);
           const paid = toCents(loan.paidAmount);
           if (total < paid)
@@ -1178,6 +1428,7 @@ export class OfflineClient {
             totalAmount: (total / 100).toFixed(2),
             interest: (interest / 100).toFixed(2),
             [personKey]: person,
+            ...(kind === "given" ? { phoneNumber: phoneNumber || null } : {}),
             dueDate: dueDate.toISOString(),
             status:
               paid === total
@@ -1358,6 +1609,25 @@ export class OfflineClient {
         const next = clone(this.document);
         // Commit the same optimistic change into the saved base before removing it from the queue.
         const applied = apply(next.records, change);
+        if (change.path === "/budgets" && result.data) {
+          const item = asObject(result.data);
+          const month = String(item.month ?? change.body.month ?? "");
+          next.budgets[month] = [...(next.budgets[month] ?? []).filter((row) => row.id !== item.id && !(row.category === item.category && row.month === month)), item];
+        }
+        if (change.path === "/finance-labels" && result.data) {
+          const item = asObject(result.data);
+          next.labels.all = [...(next.labels.all ?? []).filter((row) => row.id !== item.id), item];
+        }
+        if (change.path === "/recurring" && result.data) {
+          const item = asObject(result.data);
+          next.recurring.all = [...(next.recurring.all ?? []).filter((row) => row.id !== item.id), item];
+        }
+        if (/^\/(budgets|finance-labels|recurring)\//.test(change.path) && change.method === "DELETE") {
+          const id = change.path.split("/")[2];
+          if (change.path.startsWith("/budgets/")) for (const month of Object.keys(next.budgets)) next.budgets[month] = next.budgets[month]!.filter((row) => row.id !== id);
+          if (change.path.startsWith("/finance-labels/")) next.labels.all = (next.labels.all ?? []).map((row) => row.id === id ? { ...row, active: false } : row);
+          if (change.path.startsWith("/recurring/")) next.recurring.all = (next.recurring.all ?? []).filter((row) => row.id !== id);
+        }
         for (const [key, cached] of Object.entries(next.cache)) {
           if (key.startsWith("/summary")) {
             const temp = this.document;

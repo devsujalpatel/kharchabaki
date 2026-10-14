@@ -13,6 +13,7 @@ import {
 } from "@/lib/finance";
 import { usePreferences } from "@/lib/preferences";
 import { addExpense, addIncome } from "@/services/transactions";
+import { getLabels } from "@/lib/finance-features";
 import { dashboardSummaryQuery } from "@/services/dashboard";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { DateField } from "@/components/DateField";
@@ -38,6 +39,7 @@ export default function Dashboard() {
     description: "",
     date: today(),
   });
+  const labels = useQuery({ queryKey: ["finance-labels"], queryFn: getLabels });
   const summary = useQuery({
     queryKey: ["dashboard-summary", month],
     queryFn: () => dashboardSummaryQuery(month),
@@ -245,7 +247,7 @@ export default function Dashboard() {
           <CategoryPicker
             label={isIncome ? "Source" : "Category"}
             value={selected}
-            options={isIncome ? incomeSources : expenseCategories}
+            options={[...(isIncome ? incomeSources : expenseCategories), ...(labels.data?.data ?? []).filter((item) => item.kind === (isIncome ? "income" : "expense") && item.active).map((item) => item.key)]}
             disabled={mutation.isPending}
             onChange={(value) => {
               if (isIncome) setIncome((current) => ({ ...current, source: value }));
