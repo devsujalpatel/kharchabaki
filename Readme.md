@@ -83,6 +83,14 @@ Run these inside `services/`:
 | `pnpm db:migrate` | Apply Drizzle migrations. |
 | `pnpm db:push` | Push the schema to the configured database. |
 
+For the Vercel backend project, set **Root Directory** to `services`, configure the production `DATABASE_URL`, and use this **Build Command** to apply pending migrations only for production deployments:
+
+```bash
+if [ "$VERCEL_ENV" = "production" ]; then pnpm db:migrate; fi && pnpm build
+```
+
+For a one-time production repair, deploy the latest migration or run `pnpm db:migrate` from `services/` with the production `DATABASE_URL`. Migration `0012_repair_finance_label` restores the `finance_label` table and its indexes and foreign key if migration `0010` was recorded without the table being present. Do not run migrations from API startup or request handlers.
+
 ## Finance features
 
 Both clients provide a six-month income/expense comparison, daily chart detail, month-by-month transaction history, and income/expense editing and deletion. Forms accept transaction dates for entering older records. History supports month, type, category, and search filters, with an all-history option.

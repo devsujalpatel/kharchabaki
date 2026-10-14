@@ -85,6 +85,13 @@
       "when": 1791965860082,
       "tag": "0011_mighty_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791978803282,
+      "tag": "0012_repair_finance_label",
+      "breakpoints": true
     }
   ]
 }
