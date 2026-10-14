@@ -1,16 +1,23 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import { Check, ChevronRight, Coins, Palette, RotateCw, Search } from "lucide-react-native";
 import { currencies, currencyLabel, themes, palettes, formatLabel } from "@/lib/finance";
 import { usePreferences } from "@/lib/preferences";
 import { FormSheet } from "@/components/FormSheet";
 
+const currencyOptions = currencies.map((code) => ({ code, label: currencyLabel(code) }));
+
 export function PreferencesSettings() {
-  const { currency, theme, colors, save, saving, loading, error, retry } = usePreferences();
+  const { currency, theme, colors, save, saving, loading, error, retry, saveFailed } =
+    usePreferences();
   const [selector, setSelector] = useState<"currency" | "theme" | null>(null);
   const [search, setSearch] = useState("");
-  const options = currencies.filter((code) =>
-    currencyLabel(code).toLowerCase().includes(search.trim().toLowerCase())
+  const options = useMemo(
+    () =>
+      currencyOptions.filter(({ label }) =>
+        label.toLowerCase().includes(search.trim().toLowerCase())
+      ),
+    [search]
   );
   return (
     <View className="mt-5 overflow-hidden rounded-[22px] border border-app-border bg-app-card">
@@ -27,7 +34,6 @@ export function PreferencesSettings() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Currency: ${currencyLabel(currency)}. Change currency`}
-        disabled={saving || loading}
         onPress={() => {
           setSearch("");
           setSelector("currency");
@@ -47,7 +53,6 @@ export function PreferencesSettings() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Theme: ${formatLabel(theme)}. Change theme`}
-        disabled={saving || loading}
         onPress={() => setSelector("theme")}
         className="flex-row items-center gap-3 px-5 py-4"
       >
@@ -73,11 +78,11 @@ export function PreferencesSettings() {
       {error && (
         <View className="flex-row items-center gap-3 border-t border-app-border px-5 py-3">
           <Text accessibilityRole="alert" className="flex-1 text-xs leading-5 text-red-400">
-            {error.message}
+            {saveFailed ? "This choice could not be saved. Tap retry." : error.message}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Reload preferences"
+            accessibilityLabel={saveFailed ? "Retry saving preferences" : "Reload preferences"}
             onPress={() => void retry()}
             className="h-11 w-11 items-center justify-center rounded-xl bg-app-muted"
           >
@@ -89,7 +94,6 @@ export function PreferencesSettings() {
         visible={selector === "currency"}
         title="Currency"
         onClose={() => setSelector(null)}
-        disabled={saving}
       >
         <View className="mb-4 flex-row items-center gap-2 rounded-xl border border-app-border bg-app-bg px-3">
           <Search size={18} color={colors.subtle} />
@@ -108,21 +112,23 @@ export function PreferencesSettings() {
           Changes the symbol, without converting amounts.
         </Text>
         <View className="flex-row flex-wrap gap-2">
-          {options.map((code) => (
+          {options.map(({ code, label }) => (
             <Pressable
               key={code}
               accessibilityRole="radio"
-              accessibilityLabel={currencyLabel(code)}
+              accessibilityLabel={label}
               accessibilityState={{ selected: currency === code }}
-              disabled={saving}
-              onPress={() => save({ currency: code }, { onSuccess: () => setSelector(null) })}
+              onPress={() => {
+                save({ currency: code });
+                setSelector(null);
+              }}
               className={`min-h-12 w-[48%] flex-row items-center gap-2 rounded-xl border px-3 py-3 ${currency === code ? "border-app-primary bg-app-primary" : "border-app-border bg-app-bg"}`}
             >
               <Text
                 numberOfLines={1}
                 className={`min-w-0 flex-1 text-sm font-medium ${currency === code ? "text-app-on-primary" : "text-app-text"}`}
               >
-                {currencyLabel(code)}
+                {label}
               </Text>
               {currency === code && <Check size={16} color={colors.onPrimary} />}
             </Pressable>
@@ -137,12 +143,7 @@ export function PreferencesSettings() {
           </Text>
         )}
       </FormSheet>
-      <FormSheet
-        visible={selector === "theme"}
-        title="Theme"
-        onClose={() => setSelector(null)}
-        disabled={saving}
-      >
+      <FormSheet visible={selector === "theme"} title="Theme" onClose={() => setSelector(null)}>
         <View className="flex-row flex-wrap gap-3">
           {themes.map((option) => {
             const p = palettes[option];
@@ -152,8 +153,10 @@ export function PreferencesSettings() {
                 accessibilityRole="radio"
                 accessibilityLabel={`${formatLabel(option)} theme`}
                 accessibilityState={{ selected: theme === option }}
-                disabled={saving}
-                onPress={() => save({ theme: option }, { onSuccess: () => setSelector(null) })}
+                onPress={() => {
+                  save({ theme: option });
+                  setSelector(null);
+                }}
                 className={`w-[47%] overflow-hidden rounded-2xl border p-3 ${theme === option ? "border-app-primary" : "border-app-border"}`}
               >
                 <View

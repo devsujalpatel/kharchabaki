@@ -10,6 +10,7 @@ import {
   RotateCw,
   Trash2,
   WifiOff,
+  Smartphone,
 } from "lucide-react-native";
 import { useOfflineStatus } from "@/lib/session-provider";
 import { offlineClient, sessionManager } from "@/lib/offline-client";
@@ -40,6 +41,7 @@ export function SyncStatus() {
           : "All synced";
   const iconColor = attention ? "#d97706" : status.online ? colors.primary : colors.subtle;
   async function retry() {
+    if (!status.syncEnabled) return;
     try {
       setError(null);
       offlineClient.setOnline(true);
@@ -49,6 +51,18 @@ export function SyncStatus() {
       setError(error instanceof Error ? error.message : "Could not sync. Please retry.");
     }
   }
+  if (!status.syncEnabled)
+    return (
+      <View className="flex-row items-center gap-3 rounded-2xl border border-app-border bg-app-card p-3">
+        <View className="h-9 w-9 items-center justify-center rounded-xl bg-app-muted">
+          <Smartphone size={18} color={colors.primary} />
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text className="text-sm font-medium text-app-text">On this device</Text>
+          <Text className="mt-0.5 text-xs text-app-subtle">Cloud sync requires Premium.</Text>
+        </View>
+      </View>
+    );
   return (
     <View className="rounded-2xl border border-app-border bg-app-card p-3">
       <View className="flex-row items-center gap-3">

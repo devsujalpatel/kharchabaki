@@ -1,7 +1,7 @@
 import { type JSX, useState } from "react";
 import { ActivityIndicator, Alert, Image, Pressable, Text, TextInput, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, LogOut, Pencil, Wallet } from "lucide-react-native";
+import { Check, LogIn, LogOut, Pencil, Wallet } from "lucide-react-native";
 import { router } from "expo-router";
 import { useAppSession, useOfflineStatus } from "@/lib/session-provider";
 import { sessionManager } from "@/lib/offline-client";
@@ -80,7 +80,7 @@ export default function Profile(): JSX.Element {
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const canChange = offline.online && offline.pending === 0;
+  const canChange = !offline.syncEnabled || (offline.online && offline.pending === 0);
   const validAmount =
     amount.trim().length > 0 && Number.isFinite(Number(amount)) && Number(amount) >= 0;
   const handleBalanceSubmit = () => {
@@ -113,6 +113,17 @@ export default function Profile(): JSX.Element {
       },
     ]);
   };
+  const signIn = async () => {
+    setLoggingOut(true);
+    try {
+      await sessionManager.expire(null);
+      queryClient.clear();
+      router.replace("/");
+    } catch {
+      setLoggingOut(false);
+      Alert.alert("Could not open sign in", "Your local data is still saved. Please retry.");
+    }
+  };
 
   return (
     <View className="flex-1 bg-app-bg">
@@ -136,21 +147,23 @@ export default function Profile(): JSX.Element {
               ellipsizeMode="tail"
               className="text-base font-semibold text-app-text"
             >
-              {user.name}
+              {session.localOnly ? "Offline workspace" : user.name}
             </Text>
             <Text numberOfLines={1} ellipsizeMode="middle" className="mt-1 text-xs text-app-subtle">
-              {user.email}
+              {session.localOnly ? "On this device" : user.email}
             </Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Log out"
+            accessibilityLabel={session.localOnly ? "Sign in" : "Log out"}
             disabled={loggingOut}
-            onPress={logOut}
-            className="h-11 w-11 items-center justify-center rounded-xl bg-red-500/10"
+            onPress={session.localOnly ? signIn : logOut}
+            className={`h-11 w-11 items-center justify-center rounded-xl ${session.localOnly ? "bg-app-muted" : "bg-red-500/10"}`}
           >
             {loggingOut ? (
               <ActivityIndicator size="small" color="#f87171" />
+            ) : session.localOnly ? (
+              <LogIn size={19} color={colors.primary} />
             ) : (
               <LogOut size={19} color="#f87171" />
             )}

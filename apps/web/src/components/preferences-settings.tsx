@@ -62,7 +62,7 @@ export function PreferencesSettings() {
             <span className="text-sm font-medium">Currency</span>
             <select
               aria-label="Default currency"
-              disabled={saving}
+              disabled={loading}
               value={currency}
               onChange={(event) => save({ currency: event.target.value })}
               className="block h-11 w-full min-w-0 rounded-xl border border-input bg-background/40 px-3 text-sm"
@@ -85,7 +85,7 @@ export function PreferencesSettings() {
                 <button
                   key={option}
                   type="button"
-                  disabled={saving}
+                  disabled={loading}
                   onClick={() => save({ theme: option })}
                   aria-pressed={theme === option}
                   aria-label={`${formatLabel(option)} theme`}

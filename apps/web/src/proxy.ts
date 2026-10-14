@@ -11,6 +11,10 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/auth/signin") ||
     pathname.startsWith("/auth/signup");
 
+  // The dashboard is a client shell for both device-only and authenticated use.
+  // Server data authorization is enforced by the API, not access to this shell.
+  if (isProtectedRoute) return NextResponse.next();
+
   // Don't waste an API request on unrelated routes
   if (!isProtectedRoute && !isAuthRoute) {
     return NextResponse.next();

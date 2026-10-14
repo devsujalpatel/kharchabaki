@@ -1,7 +1,9 @@
 import { AntDesign } from "@expo/vector-icons";
 import { Button } from "heroui-native";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { Smartphone } from "lucide-react-native";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
 import { useAppSession, useOfflineStatus } from "@/lib/session-provider";
@@ -19,6 +21,20 @@ export default function HomeScreen() {
   const offline = useOfflineStatus();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [startingOffline, setStartingOffline] = useState(false);
+
+  const handleOffline = async () => {
+    setStartingOffline(true);
+    setError(null);
+    try {
+      await sessionManager.startOffline();
+      router.replace("/dashboard");
+    } catch {
+      setError("Could not open your saved workspace. Please retry.");
+    } finally {
+      setStartingOffline(false);
+    }
+  };
 
   const handleLogin = async () => {
     setLoading(true);
@@ -139,7 +155,7 @@ export default function HomeScreen() {
         <Button
           size="lg"
           className="bg-[#cbff3d] active:bg-[#cbff3d]/80"
-          isDisabled={loading || !offline.online}
+          isDisabled={loading || startingOffline || !offline.online}
           onPress={handleLogin}
         >
           <AntDesign name="google" size={18} color="#000" />
@@ -148,8 +164,23 @@ export default function HomeScreen() {
           </Text>
         </Button>
 
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Continue offline only, without signing up"
+          disabled={loading || startingOffline}
+          onPress={handleOffline}
+          className="h-14 flex-row items-center justify-center gap-2 rounded-2xl border border-neutral-700 bg-neutral-900"
+        >
+          {startingOffline ? (
+            <ActivityIndicator size="small" color="#cbff3d" />
+          ) : (
+            <Smartphone size={19} color="#cbff3d" />
+          )}
+          <Text className="text-base font-semibold text-neutral-100">Offline only</Text>
+        </Pressable>
+
         <Text className="text-center text-xs text-neutral-400">
-          Free forever, no ads, and your data stays yours.
+          No account needed. Saved on this device. Cloud sync is a Premium feature.
         </Text>
         <Text className="text-center text-xs text-neutral-600">
           By continuing, you agree to our Terms of Service and Privacy Policy.

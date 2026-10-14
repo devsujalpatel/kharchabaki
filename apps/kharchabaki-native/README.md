@@ -42,3 +42,9 @@ You can start developing by editing the files inside the **src/app** directory. 
 - [Expo documentation](https://docs.expo.dev/) — Expo fundamentals and guides
 - [Uniwind documentation](https://docs.uniwind.dev) — Tailwind for React Native
 - [Expo Router](https://docs.expo.dev/router/introduction) — file-based routing
+
+## Device mode, Premium, and performance
+
+The login screen offers **Offline only** without an account. Guest data and signed-in free data use isolated AsyncStorage workspaces. Only `user.isPremium === true` enables cloud finance sync, with server authorization as the final check. Apply the service's `0009_premium_entitlement` migration before using this app with the API. See [the project README](../../Readme.md) for storage transitions and migration details.
+
+Saved identity and preferences restore before network verification. Themes update immediately with last-choice protection, currency formatting reuses one formatter, query invalidation targets affected data, and transaction history uses a virtualized list. Measure scrolling and theme timing on a release build on a phone; development overhead does not reflect release performance.

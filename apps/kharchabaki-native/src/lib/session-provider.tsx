@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { AppState } from "react-native";
 import * as Network from "expo-network";
-import { focusManager, useQueryClient } from "@tanstack/react-query";
+import { focusManager, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { authClient } from "./auth-client";
 import { offlineClient, sessionManager } from "./offline-client";
 import type { SessionState } from "./session-manager";
@@ -13,6 +13,29 @@ export function useOfflineStatus() {
     offlineClient.getSnapshot
   );
 }
+function invalidateData(client: QueryClient, path?: string) {
+  const keys =
+    path === "/preferences"
+      ? ["preferences"]
+      : path?.startsWith("/loans")
+        ? ["loans", "balance", "dashboard-summary"]
+        : path?.startsWith("/income") || path?.startsWith("/expense") || path === "/balance"
+          ? ["transactions", "balance", "dashboard-summary"]
+          : null;
+  void client.invalidateQueries(
+    keys ? { predicate: (query) => keys.includes(String(query.queryKey[0])) } : undefined
+  );
+}
+function AuthSessionBridge() {
+  const auth = authClient.useSession();
+  useEffect(() => {
+    if (auth.isPending || auth.error || !offlineClient.getSnapshot().online) return;
+    // Verify both sign-in and sign-out transitions. A free account has no cloud
+    // finance requests that would otherwise detect a revoked auth session.
+    if (auth.data?.session.id || sessionManager.getSnapshot().data) void sessionManager.refresh();
+  }, [auth.data?.session.id, auth.isPending, auth.error]);
+  return null;
+}
 export function SessionProvider({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const state = useSyncExternalStore(
@@ -20,55 +43,70 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     sessionManager.getSnapshot,
     sessionManager.getSnapshot
   );
-  const auth = authClient.useSession();
   useEffect(() => {
     const accountChanged = sessionManager.onAccountChange(() => client.clear());
-    void Network.getNetworkStateAsync()
-      .then((network) => {
-        offlineClient.setOnline(
-          network.isConnected !== false && network.isInternetReachable !== false
-        );
-        return sessionManager.bootstrap();
-      })
-      .catch(() => sessionManager.bootstrap());
+    // Restore device data immediately; connectivity does not block the first screen.
+    void sessionManager.bootstrap();
     const expired = offlineClient.onUnauthorized(() => {
       void sessionManager.expire();
     });
-    const changed = offlineClient.onDataChange(() => {
-      void client.invalidateQueries();
+    const changes = new Set<string>();
+    let changeTimer: ReturnType<typeof setTimeout> | null = null;
+    const changed = offlineClient.onDataChange((path?: string) => {
+      changes.add(path ?? "all");
+      if (changeTimer) return;
+      changeTimer = setTimeout(() => {
+        changeTimer = null;
+        if (changes.has("all")) invalidateData(client);
+        else for (const value of changes) invalidateData(client, value);
+        changes.clear();
+      }, 32);
     });
     const reconnect = async () => {
+      if (sessionManager.getSnapshot().data?.localOnly) return;
       await sessionManager.refresh();
-      if (sessionManager.getSnapshot().data) {
+      if (offlineClient.getSnapshot().syncEnabled) {
         await offlineClient.flush();
         void client.invalidateQueries();
       }
     };
-    const network = Network.addNetworkStateListener((value) => {
+    const updateConnection = (value: {
+      isConnected?: boolean | null;
+      isInternetReachable?: boolean | null;
+    }) => {
+      const wasOnline = offlineClient.getSnapshot().online;
       const online = value.isConnected !== false && value.isInternetReachable !== false;
       offlineClient.setOnline(online);
-      if (online) void reconnect();
-    });
+      if (online && !wasOnline) void reconnect();
+    };
+    void Network.getNetworkStateAsync()
+      .then(updateConnection)
+      .catch(() => {});
+    const network = Network.addNetworkStateListener(updateConnection);
     const active = AppState.addEventListener("change", (value) => {
       focusManager.setFocused(value === "active");
       sessionManager.checkExpiry();
-      if (value === "active")
-        void Network.getNetworkStateAsync().then((network) => {
-          offlineClient.setOnline(
-            network.isConnected !== false && network.isInternetReachable !== false
-          );
-          if (offlineClient.getSnapshot().online) void reconnect();
-        });
+      if (value === "active" && !sessionManager.getSnapshot().data?.localOnly)
+        void Network.getNetworkStateAsync()
+          .then((value) => {
+            updateConnection(value);
+            if (offlineClient.getSnapshot().online) void reconnect();
+          })
+          .catch(() => {});
     });
     const timer = setInterval(() => {
       sessionManager.checkExpiry();
-      if (AppState.currentState === "active" && offlineClient.getSnapshot().pending)
-        void Network.getNetworkStateAsync().then((network) => {
-          offlineClient.setOnline(
-            network.isConnected !== false && network.isInternetReachable !== false
-          );
-          if (offlineClient.getSnapshot().online) void reconnect();
-        });
+      if (
+        AppState.currentState === "active" &&
+        offlineClient.getSnapshot().syncEnabled &&
+        offlineClient.getSnapshot().pending
+      )
+        void Network.getNetworkStateAsync()
+          .then((value) => {
+            updateConnection(value);
+            if (offlineClient.getSnapshot().online) void reconnect();
+          })
+          .catch(() => {});
     }, 30_000);
     return () => {
       accountChanged();
@@ -77,20 +115,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       network.remove();
       active.remove();
       clearInterval(timer);
+      if (changeTimer) clearTimeout(changeTimer);
     };
   }, [client]);
   useEffect(() => {
-    if (auth.data?.session.id) {
-      void Network.getNetworkStateAsync().then((network) => {
-        offlineClient.setOnline(
-          network.isConnected !== false && network.isInternetReachable !== false
-        );
-        void sessionManager.refresh(true);
-      });
-    }
-  }, [auth.data?.session.id]);
-  useEffect(() => {
-    if (!state.data) return;
+    if (!state.data || state.data.localOnly) return;
     const delay = Math.min(
       2_000_000_000,
       Math.max(0, new Date(state.data.session.expiresAt).getTime() - Date.now())
@@ -99,20 +128,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [state.data]);
   useEffect(() => {
-    const id = state.data?.user.id ?? null;
-    if (id)
-      void Promise.allSettled(
-        [
-          "/transactions",
-          "/summary",
-          "/preferences",
-          "/balance",
-          "/loans/taken",
-          "/loans/given",
-        ].map((path) => offlineClient.request(path))
-      );
-  }, [state.data?.user.id, client]);
-  return <Context.Provider value={state}>{children}</Context.Provider>;
+    if (!state.data?.user.isPremium || state.data.localOnly) return;
+    const timer = setTimeout(() => {
+      void offlineClient.request("/transactions").catch(() => {});
+    }, 750);
+    return () => clearTimeout(timer);
+  }, [state.data?.user.id, state.data?.user.isPremium, state.data?.localOnly]);
+  return (
+    <Context.Provider value={state}>
+      {!state.isPending && !state.data?.localOnly && <AuthSessionBridge />}
+      {children}
+    </Context.Provider>
+  );
 }
 export function useAppSession() {
   const value = useContext(Context);

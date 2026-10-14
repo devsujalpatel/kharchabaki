@@ -1,5 +1,13 @@
 import { type JSX, type ReactNode, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -8,7 +16,9 @@ import {
   ChevronDown,
   ChevronUp,
   HandCoins,
+  Pencil,
   Plus,
+  Trash2,
 } from "lucide-react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -18,6 +28,8 @@ import { usePreferences } from "@/lib/preferences";
 import {
   createGivenLoan,
   createTakenLoan,
+  deleteGivenLoan,
+  deleteTakenLoan,
   getGivenLoans,
   getTakenLoans,
   recordGivenLoanPayment,
@@ -25,6 +37,8 @@ import {
   type ApiResponse,
   type GivenLoan,
   type TakenLoan,
+  updateGivenLoan,
+  updateTakenLoan,
 } from "@/lib/loan";
 
 type LoanKind = "taken" | "given";
@@ -36,6 +50,10 @@ export default function Loans(): JSX.Element {
   const { colors, formatMoney } = usePreferences();
   const [kind, setKind] = useState<LoanKind>("taken");
   const [createKind, setCreateKind] = useState<LoanKind>("taken");
+  const [editingLoan, setEditingLoan] = useState<{
+    kind: LoanKind;
+    loan: TakenLoan | GivenLoan;
+  } | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dueDate, setDueDate] = useState(new Date());
@@ -56,6 +74,16 @@ export default function Loans(): JSX.Element {
         dueDate: formatDateForApi(dueDate),
         interest: form.interest.trim(),
       };
+      if (editingLoan?.kind === "taken")
+        return updateTakenLoan(editingLoan.loan.id, {
+          ...values,
+          borrowedFrom: form.person.trim(),
+        });
+      if (editingLoan?.kind === "given")
+        return updateGivenLoan(editingLoan.loan.id, {
+          ...values,
+          borrowerName: form.person.trim(),
+        });
       return createKind === "taken"
         ? createTakenLoan({ ...values, borrowedFrom: form.person.trim() })
         : createGivenLoan({ ...values, borrowerName: form.person.trim() });
@@ -63,6 +91,7 @@ export default function Loans(): JSX.Element {
     onSuccess: () => {
       setShowForm(false);
       setForm(initialForm);
+      setEditingLoan(null);
       setKind(createKind);
       refreshLoans();
     },
@@ -73,13 +102,29 @@ export default function Loans(): JSX.Element {
     (sum, loan) => sum + Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount)),
     0
   );
-  const canChange = offline.online && offline.pending === 0;
+  const canChange = !offline.syncEnabled || (offline.online && offline.pending === 0);
   const accent = kind === "taken" ? "#d97706" : "#059669";
 
   const openForm = () => {
+    setEditingLoan(null);
     setCreateKind(kind);
     setForm(initialForm);
     setDueDate(new Date());
+    setFormError("");
+    setShowDatePicker(false);
+    createMutation.reset();
+    setShowForm(true);
+  };
+  const openEdit = (loanKind: LoanKind, loan: TakenLoan | GivenLoan) => {
+    setEditingLoan({ kind: loanKind, loan });
+    setCreateKind(loanKind);
+    setForm({
+      amount: loan.amount,
+      person: "borrowedFrom" in loan ? loan.borrowedFrom : loan.borrowerName,
+      interest: loan.interest,
+    });
+    const [year, month, day] = loan.dueDate.slice(0, 10).split("-").map(Number);
+    setDueDate(new Date(year, month - 1, day));
     setFormError("");
     setShowDatePicker(false);
     createMutation.reset();
@@ -180,14 +225,21 @@ export default function Loans(): JSX.Element {
         ) : (
           <View className="gap-3">
             {loans.map((loan) => (
-              <LoanRow key={loan.id} kind={kind} loan={loan} onRefresh={refreshLoans} />
+              <LoanRow
+                key={loan.id}
+                kind={kind}
+                loan={loan}
+                onRefresh={refreshLoans}
+                onEdit={() => openEdit(kind, loan)}
+                canChange={canChange}
+              />
             ))}
           </View>
         )}
       </ScrollView>
       <FormSheet
         visible={showForm}
-        title="Add loan"
+        title={editingLoan ? "Edit loan" : "Add loan"}
         onClose={() => {
           setShowForm(false);
           setShowDatePicker(false);
@@ -205,11 +257,17 @@ export default function Loans(): JSX.Element {
             ) : (
               <Check size={19} color={colors.onPrimary} />
             )}
-            <Text className="font-semibold text-app-on-primary">Save loan</Text>
+            <Text className="font-semibold text-app-on-primary">
+              {editingLoan ? "Save changes" : "Save loan"}
+            </Text>
           </Pressable>
         }
       >
-        <LoanTabs kind={createKind} onChange={setCreateKind} disabled={createMutation.isPending} />
+        <LoanTabs
+          kind={createKind}
+          onChange={setCreateKind}
+          disabled={createMutation.isPending || !!editingLoan}
+        />
         <LoanField label="Amount">
           <TextInput
             accessibilityLabel="Loan amount"
@@ -332,17 +390,21 @@ function LoanRow({
   kind,
   loan,
   onRefresh,
+  onEdit,
+  canChange,
 }: {
   kind: LoanKind;
   loan: TakenLoan | GivenLoan;
   onRefresh: () => void;
+  onEdit: () => void;
+  canChange: boolean;
 }) {
-  const offline = useOfflineStatus();
   const { formatMoney, colors } = usePreferences();
   const [showPayment, setShowPayment] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [amount, setAmount] = useState("");
   const [paymentError, setPaymentError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   const person = "borrowedFrom" in loan ? loan.borrowedFrom : loan.borrowerName;
   const outstanding = Math.max(0, Number(loan.totalAmount) - Number(loan.paidAmount));
   const paidProgress =
@@ -350,8 +412,29 @@ function LoanRow({
       ? Math.min(100, (Number(loan.paidAmount) / Number(loan.totalAmount)) * 100)
       : 0;
   const paid = loan.status === "paid" || outstanding === 0;
-  const canChange = offline.online && offline.pending === 0;
   const accent = kind === "taken" ? "#d97706" : "#059669";
+  const deleteMutation = useMutation({
+    mutationFn: () => (kind === "taken" ? deleteTakenLoan(loan.id) : deleteGivenLoan(loan.id)),
+    onSuccess: onRefresh,
+  });
+  const confirmDelete = () => {
+    setDeleteError("");
+    Alert.alert(
+      "Delete loan?",
+      "This removes the loan and its payment history, and reverses its balance effects.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () =>
+            deleteMutation.mutate(undefined, {
+              onError: (error) => setDeleteError(error.message),
+            }),
+        },
+      ]
+    );
+  };
   const paymentMutation = useMutation({
     mutationFn: () =>
       kind === "taken"
@@ -459,6 +542,37 @@ function LoanRow({
           style={{ width: `${paidProgress}%`, backgroundColor: accent }}
         />
       </View>
+      <View className="mt-3 flex-row justify-end gap-2">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Edit loan for ${person}`}
+          disabled={!canChange || deleteMutation.isPending}
+          onPress={onEdit}
+          className={`h-10 flex-row items-center gap-2 rounded-xl bg-app-muted px-3 ${!canChange || deleteMutation.isPending ? "opacity-40" : ""}`}
+        >
+          <Pencil size={15} color={colors.subtle} />
+          <Text className="text-xs font-medium text-app-text">Edit</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Delete loan for ${person}`}
+          disabled={!canChange || deleteMutation.isPending}
+          onPress={confirmDelete}
+          className={`h-10 flex-row items-center gap-2 rounded-xl bg-app-muted px-3 ${!canChange || deleteMutation.isPending ? "opacity-40" : ""}`}
+        >
+          {deleteMutation.isPending ? (
+            <ActivityIndicator size="small" color={colors.subtle} />
+          ) : (
+            <Trash2 size={15} color="#f87171" />
+          )}
+          <Text className="text-xs font-medium text-red-400">Delete</Text>
+        </Pressable>
+      </View>
+      {deleteError && (
+        <Text accessibilityRole="alert" className="mt-2 text-xs text-red-400">
+          {deleteError}
+        </Text>
+      )}
       {expanded && (
         <View className="mt-4 gap-2 border-t border-app-border pt-3">
           <Detail label="Principal" value={formatMoney(loan.amount)} />

@@ -6,7 +6,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 import { offlineClient, sessionManager } from "@/lib/offline-client";
 import type { SessionState } from "@/lib/session-manager";
@@ -18,6 +18,35 @@ export function useOfflineStatus() {
     offlineClient.getSnapshot,
   );
 }
+function invalidateData(client: QueryClient, path?: string) {
+  const keys =
+    path === "/preferences"
+      ? ["preferences"]
+      : path?.startsWith("/loans")
+        ? ["loans", "balance", "dashboard-summary"]
+        : path?.startsWith("/income") ||
+            path?.startsWith("/expense") ||
+            path === "/balance"
+          ? ["transactions", "balance", "dashboard-summary"]
+          : null;
+  void client.invalidateQueries(
+    keys
+      ? { predicate: (query) => keys.includes(String(query.queryKey[0])) }
+      : undefined,
+  );
+}
+function AuthSessionBridge() {
+  const auth = authClient.useSession();
+  useEffect(() => {
+    if (auth.isPending || auth.error || !offlineClient.getSnapshot().online)
+      return;
+    // Verify both sign-in and sign-out transitions. A free account has no cloud
+    // finance requests that would otherwise detect a revoked auth session.
+    if (auth.data?.session.id || sessionManager.getSnapshot().data)
+      void sessionManager.refresh();
+  }, [auth.data?.session.id, auth.isPending, auth.error]);
+  return null;
+}
 export function SessionProvider({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const state = useSyncExternalStore(
@@ -25,7 +54,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     sessionManager.getSnapshot,
     sessionManager.getSnapshot,
   );
-  const auth = authClient.useSession();
   useEffect(() => {
     const accountChanged = sessionManager.onAccountChange(() => client.clear());
     offlineClient.setOnline(navigator.onLine);
@@ -42,14 +70,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (event.data === offlineClient.getAccount())
           void offlineClient.reload().then(() => client.invalidateQueries());
       };
-    const changed = offlineClient.onDataChange(() => {
+    const changed = offlineClient.onDataChange((path?: string) => {
       channel?.postMessage(offlineClient.getAccount());
-      void client.invalidateQueries();
+      invalidateData(client, path);
     });
     const reconnect = async () => {
       offlineClient.setOnline(true);
+      if (sessionManager.getSnapshot().data?.localOnly) return;
       await sessionManager.refresh();
-      if (sessionManager.getSnapshot().data) {
+      if (offlineClient.getSnapshot().syncEnabled) {
         await offlineClient.flush();
         void client.invalidateQueries();
       }
@@ -67,6 +96,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       sessionManager.checkExpiry();
       if (
         navigator.onLine &&
+        offlineClient.getSnapshot().syncEnabled &&
         offlineClient.getSnapshot().pending &&
         document.visibilityState === "visible"
       )
@@ -84,13 +114,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [client]);
   useEffect(() => {
-    if (auth.data?.session.id) {
-      offlineClient.setOnline(navigator.onLine);
-      void sessionManager.refresh(true);
-    }
-  }, [auth.data?.session.id]);
-  useEffect(() => {
-    if (!state.data) return;
+    if (!state.data || state.data.localOnly) return;
     const delay = Math.min(
       2_000_000_000,
       Math.max(
@@ -102,20 +126,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [state.data]);
   useEffect(() => {
-    const id = state.data?.user.id ?? null;
-    if (id)
-      void Promise.allSettled(
-        [
-          "/transactions",
-          "/summary",
-          "/preferences",
-          "/balance",
-          "/loans/taken",
-          "/loans/given",
-        ].map((path) => offlineClient.request(path)),
-      );
-  }, [state.data?.user.id, client]);
-  return <Context.Provider value={state}>{children}</Context.Provider>;
+    if (!state.data?.user.isPremium || state.data.localOnly) return;
+    const timer = setTimeout(() => {
+      void offlineClient.request("/transactions").catch(() => {});
+    }, 750);
+    return () => clearTimeout(timer);
+  }, [state.data?.user.id, state.data?.user.isPremium, state.data?.localOnly]);
+  return (
+    <Context.Provider value={state}>
+      {!state.isPending && !state.data?.localOnly && <AuthSessionBridge />}
+      {children}
+    </Context.Provider>
+  );
 }
 export function useAppSession() {
   const value = useContext(Context);

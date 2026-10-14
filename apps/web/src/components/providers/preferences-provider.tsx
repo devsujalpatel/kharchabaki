@@ -1,53 +1,215 @@
 "use client";
-import { createContext, useContext, useEffect, type ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "next-themes";
-import { api } from "@/lib/api";
-import { useAppSession } from "@/components/providers/session-provider";
-import { formatCurrency, type Preferences } from "@/lib/finance";
 
-type Response = { data: Preferences };
+import { api } from "@/lib/api";
+import { offlineClient } from "@/lib/offline-client";
+import { useAppSession } from "@/components/providers/session-provider";
+import { palettes, themes, type Preferences } from "@/lib/finance";
+
+const defaults: Preferences = { currency: "INR", theme: "dark" };
+function savedPreferences(
+  value: Record<string, unknown> | null,
+): Preferences | undefined {
+  if (
+    !value ||
+    typeof value.currency !== "string" ||
+    !/^[A-Z]{3}$/.test(value.currency) ||
+    !themes.some((theme) => theme === value.theme)
+  )
+    return undefined;
+  return {
+    currency: value.currency,
+    theme: value.theme as Preferences["theme"],
+  };
+}
+type SaveOptions = {
+  onSuccess?: (preferences: Preferences) => void;
+  onError?: (error: Error) => void;
+};
+
+async function request(
+  method: string,
+  input?: Partial<Preferences>,
+): Promise<Preferences> {
+  return (
+    await api<{ data: Preferences }>("/preferences", {
+      method,
+      ...(input ? { body: JSON.stringify(input) } : {}),
+    })
+  ).data;
+}
 function useAccountPreferences() {
   const client = useQueryClient();
   const { data: session } = useAppSession();
-  const { setTheme } = useTheme();
-  const key = ["preferences", session?.user.id];
+  const account = session
+    ? `${session.user.id}:${session.localOnly || !session.user.isPremium ? "local" : "cloud"}`
+    : undefined;
+  const key = useMemo(() => ["preferences", account], [account]);
+  const currentAccount = useRef(account);
+  const revision = useRef(0);
+  const optimistic = useRef<{ account?: string; values: Partial<Preferences> }>(
+    {
+      account,
+      values: {},
+    },
+  );
+  const [draft, setDraft] = useState<{
+    account?: string;
+    values: Partial<Preferences>;
+  }>({
+    account,
+    values: {},
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<Error | null>(null);
+  useLayoutEffect(() => {
+    currentAccount.current = account;
+    revision.current++;
+    optimistic.current = { account, values: {} };
+    setDraft(optimistic.current);
+    setSaving(false);
+    setSaveError(null);
+    return () => {
+      currentAccount.current = undefined;
+    };
+  }, [account]);
   const query = useQuery({
     queryKey: key,
-    queryFn: () => api<Response>("/preferences"),
-    enabled: !!session,
+    queryFn: () => request("GET"),
+    enabled: !!account,
+    initialData: () => savedPreferences(offlineClient.getCachedPreferences()),
+    initialDataUpdatedAt: 0,
   });
-  const mutation = useMutation({
-    mutationFn: (input: Partial<Preferences>) =>
-      api<Response>("/preferences", {
-        method: "PATCH",
-        body: JSON.stringify(input),
+  const refetch = query.refetch;
+  const save = useCallback(
+    (input: Partial<Preferences>, options?: SaveOptions) => {
+      if (!account) return;
+      const nextRevision = ++revision.current;
+      const values = {
+        ...(optimistic.current.account === account
+          ? optimistic.current.values
+          : {}),
+        ...input,
+      };
+      optimistic.current = { account, values };
+      setDraft(optimistic.current);
+      setSaving(true);
+      setSaveError(null);
+      // Update before waiting for storage or a cloud connection. Subsequent selections stay usable.
+      client.setQueryData<Preferences>(key, (previous) => ({
+        ...defaults,
+        ...previous,
+        ...values,
+      }));
+      void request("PATCH", values)
+        .then((data) => {
+          if (
+            currentAccount.current !== account ||
+            revision.current !== nextRevision
+          )
+            return;
+          // A slower response must never replace a newer choice or a different preference field.
+          const latest =
+            optimistic.current.account === account
+              ? optimistic.current.values
+              : {};
+          const preferences = { ...data, ...latest };
+          client.setQueryData(key, preferences);
+          setSaving(false);
+          setSaveError(null);
+          options?.onSuccess?.(preferences);
+        })
+        .catch((reason: unknown) => {
+          if (
+            currentAccount.current !== account ||
+            revision.current !== nextRevision
+          )
+            return;
+          const error =
+            reason instanceof Error
+              ? reason
+              : new Error("Could not save preferences. Please retry.");
+          // Keep the chosen appearance; a failed persistence attempt has an explicit retry.
+          setSaving(false);
+          setSaveError(error);
+          options?.onError?.(error);
+        });
+    },
+    [account, client, key],
+  );
+  const retry = useCallback(() => {
+    if (saveError && optimistic.current.account === account) {
+      save(optimistic.current.values);
+      return;
+    }
+    void refetch();
+  }, [account, refetch, save, saveError]);
+  const preferences = useMemo(
+    () => ({
+      ...defaults,
+      ...query.data,
+      ...(draft.account === account ? draft.values : {}),
+    }),
+    [query.data, draft, account],
+  );
+  const formatter = useMemo(
+    () =>
+      new Intl.NumberFormat(preferences.currency === "INR" ? "en-IN" : "en", {
+        style: "currency",
+        currency: preferences.currency,
+        currencyDisplay: "narrowSymbol",
       }),
-    onSuccess: (data) => client.setQueryData(key, data),
-  });
-  const preferences = query.data?.data ?? {
-    currency: "INR",
-    theme: "dark" as const,
-  };
-  useEffect(() => {
-    if (query.data) setTheme(query.data.data.theme);
-  }, [query.data, setTheme]);
-  return {
-    ...preferences,
-    formatMoney: (value: number | string) =>
-      formatCurrency(value, preferences.currency),
-    save: mutation.mutate,
-    saving: mutation.isPending,
-    loading: query.isPending,
-    error: mutation.error ?? query.error,
-    retry: query.refetch,
-  };
+    [preferences.currency],
+  );
+  const formatMoney = useCallback(
+    (value: number | string) => formatter.format(Number(value)),
+    [formatter],
+  );
+  const error = saveError ?? query.error;
+  return useMemo(
+    () => ({
+      ...preferences,
+      colors: palettes[preferences.theme],
+      formatMoney,
+      save,
+      saving,
+      loading: query.isPending,
+      saveFailed: !!saveError,
+      error,
+      retry,
+    }),
+    [
+      preferences,
+      formatMoney,
+      save,
+      saving,
+      query.isPending,
+      saveError,
+      error,
+      retry,
+    ],
+  );
 }
 const Context = createContext<ReturnType<typeof useAccountPreferences> | null>(
   null,
 );
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const value = useAccountPreferences();
+  const { setTheme } = useTheme();
+  useLayoutEffect(() => {
+    setTheme(value.theme);
+  }, [value.theme, setTheme]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export function usePreferences() {

@@ -107,7 +107,9 @@ export default function Dashboard() {
     <KeyboardScreen>
       <View className="mb-2">
         <Text numberOfLines={1} className="text-sm text-app-subtle">
-          Hi, {session?.user.name.split(" ")[0] || "there"}
+          {session?.localOnly
+            ? "Saved on this device"
+            : `Hi, ${session?.user.name.split(" ")[0] || "there"}`}
         </Text>
         <Text
           accessibilityRole="header"

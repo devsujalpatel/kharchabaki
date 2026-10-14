@@ -4,6 +4,7 @@ import { SERVICE_NAME } from '../config/constans.js';
 
 // Middlewares
 import { checkAuth } from '../middleware/auth.middleware.js';
+import { checkPremium } from '../middleware/premium.middleware.js';
 
 // Routes
 import { authRouter } from '../modules/auth/auth.route.js';
@@ -38,12 +39,13 @@ apiRouter.get('/health', (_request, response) => {
 
 apiRouter.use(authRouter);
 
-// protected routes
-apiRouter.use(checkAuth, balanceRouter);
-apiRouter.use(checkAuth, transactionRouter);
-apiRouter.use(checkAuth, incomeRouter);
-apiRouter.use(checkAuth, expenseRouter);
-apiRouter.use(checkAuth, summaryRouter);
-apiRouter.use(checkAuth, loanRouter);
-
-apiRouter.use(checkAuth, preferencesRouter);
+// Cloud finance data and preference sync are a premium entitlement. /me and
+// Better Auth stay available to every account, including local-only users.
+apiRouter.use(checkAuth, checkPremium);
+apiRouter.use(balanceRouter);
+apiRouter.use(transactionRouter);
+apiRouter.use(incomeRouter);
+apiRouter.use(expenseRouter);
+apiRouter.use(summaryRouter);
+apiRouter.use(loanRouter);
+apiRouter.use(preferencesRouter);

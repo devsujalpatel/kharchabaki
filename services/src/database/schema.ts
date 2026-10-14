@@ -15,6 +15,7 @@ export const user = pgTable('user', {
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').default(false).notNull(),
+  isPremium: boolean('is_premium').default(false).notNull(),
   image: text('image'),
   currency: text('currency').default('INR').notNull(),
   theme: text('theme').default('dark').notNull(),

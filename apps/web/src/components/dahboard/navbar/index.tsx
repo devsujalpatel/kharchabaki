@@ -66,7 +66,7 @@ export function Navbar() {
       .toUpperCase() ?? "U";
 
   const handleSignOut = async () => {
-    await authClient.signOut();
+    if (!session?.localOnly) await authClient.signOut();
     await sessionManager.expire(null);
     queryClient.clear();
     router.push("/auth/signin");

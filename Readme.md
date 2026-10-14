@@ -97,7 +97,7 @@ pnpm db:migrate
 
 The migration adds categories and account preferences while preserving existing transactions and legacy income source values.
 
-Authenticated finance endpoints (under `/api/v1`):
+Premium authenticated finance endpoints (under `/api/v1`):
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -109,16 +109,27 @@ Authenticated finance endpoints (under `/api/v1`):
 
 Creation and edit requests accept `amount`, `source` (income) or `category` (expense), optional `description`, and optional `occurredAt` as an ISO UTC timestamp. Editing requires amount and source/category; an omitted date preserves the original date. Amounts must be positive with at most two decimal places. Month boundaries and chart dates use UTC. The balance card always shows the current account balance, including when viewing an older month.
 
-## Offline use
+## Device storage and Premium sync
 
-After installing dependencies, rebuild the mobile development app with `pnpm android` or `pnpm ios` in `apps/kharchabaki-native`; AsyncStorage and Expo Crypto need native modules in the build.
+Choose **Offline only** on the login screen to use the app without an account or connection. The guest workspace persists on the device and does not expire. Income, expenses, charts, opening balance, loans, repayments, currency, and themes all work locally. Returning to login or signing in preserves the guest workspace; it remains separate from signed-in accounts.
 
-Web stores account-scoped finance snapshots and pending changes in IndexedDB; mobile uses AsyncStorage. Income and expense creation, editing, deletion, and preference changes work offline, update local history and charts, and sync in order after reconnection or returning to the app. A sync indicator shows pending changes and server rejections, with retry, correction through the transaction editor, and discard controls. Browser tabs coordinate writes and syncing through Web Locks where available.
+Signed-in free accounts also use device storage. `user.isPremium` defaults to `false`; cloud finance and preference APIs return `403` unless the authenticated database account is Premium. `/me` and sign-in remain available to every account. Clients cannot grant Premium through signup, profile updates, headers, or request bodies. There is no billing flow or user-facing Premium toggle; entitlement must be set by a trusted server/admin process.
 
-Connect once while signed in to save your history, summaries, settings, and loans on a device. Cached complete history supports browsing other months offline. Loan creation/payments and opening-balance replacement require a connection and an empty pending queue. The web service worker caches the visited app shell and assets in production; run `pnpm build` followed by `pnpm start` in `apps/web` to test offline reopening. API responses and session tokens are excluded from the service-worker cache.
+Apply `services/drizzle/0009_premium_entitlement.sql` through the usual migration command before deploying these clients and API:
 
-A valid saved session permits offline access until its recorded expiry. Confirmed API 401 responses and known session expiry send users to login. An outage preserves valid offline access, and signing in again with the same account restores its unsynced work. Session snapshots store user identity and expiry, without authentication tokens. Native authentication cookies continue to use SecureStore.
+```bash
+cd services
+pnpm db:migrate
+```
 
-Offline transaction creation uses a client UUID. The API recognizes a retry of an existing owned UUID and avoids charging or crediting the balance twice if a response was lost. Deploy the updated API together with the clients.
+This adds the default-false flag to existing and new users. It does not delete server data. Existing cached finance data for the same account is copied into its first device workspace so local history remains usable. The original cloud snapshot and pending queue remain intact. Device and cloud workspaces stay separate; later device-only changes are not automatically uploaded when an account becomes Premium.
 
-Run the persistence and session checks from `services/` with `pnpm test:offline`. These exercise offline restarts, local edits/deletion, synchronization, lost responses, storage failures, account isolation, concurrent browser tabs, and session expiry; `pnpm test` covers API balance and retry behavior.
+Web uses account-scoped IndexedDB; mobile uses AsyncStorage. Free and guest changes commit locally without a sync queue or finance API requests. Premium transaction and preference changes queue offline, update local history/charts, and replay in order after reconnecting. Premium loan changes and opening-balance replacement still require a connection and an empty pending queue. Browser tabs coordinate writes and syncing through Web Locks where available.
+
+A server `403` stops further cloud requests and persists the revoked entitlement. A valid signed-in session permits offline access until its recorded expiry; confirmed `401` responses or known expiry send users to login while retaining saved data. Guest mode makes no auth-session requests. Session snapshots contain identity, entitlement, and expiry without authentication tokens; native authentication cookies use SecureStore.
+
+Native startup restores device data before waiting for network verification. Theme choices apply immediately, remain selectable during saves, and preserve the latest choice if older requests finish later. Preferences and currency formatters are memoized, and transaction history uses a virtualized `SectionList` with memoized rows. Hardware frame-rate and keyboard testing should use a release build.
+
+The production web service worker caches visited app pages and assets, excluding API responses and session tokens. Run `pnpm build` followed by `pnpm start` in `apps/web` to test offline reopening. Native builds need AsyncStorage and Expo Crypto modules (`pnpm android` or `pnpm ios` in `apps/kharchabaki-native`).
+
+Run `pnpm test:offline` from `services/` for guest persistence, free/Premium isolation, local finance validation, queued sync, response loss, storage failures, concurrent tabs, revocation, and expiry. `pnpm test` covers finance APIs and Premium authorization, including blocked client entitlement changes.

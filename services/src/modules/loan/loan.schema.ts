@@ -32,6 +32,20 @@ export const createGivenLoanSchema = z.object({
   interest: interest.default('0.00'),
 });
 
+export const updateTakenLoanSchema = z.object({
+  amount: positiveAmount,
+  borrowedFrom: z.string().trim().min(1).max(100),
+  dueDate: z.coerce.date(),
+  interest: interest.default('0.00'),
+});
+
+export const updateGivenLoanSchema = z.object({
+  amount: positiveAmount,
+  borrowerName: z.string().trim().min(1).max(100),
+  dueDate: z.coerce.date(),
+  interest: interest.default('0.00'),
+});
+
 export const createLoanPaymentSchema = z.object({
   amount: positiveAmount,
   paidAt: z.coerce.date().optional(),

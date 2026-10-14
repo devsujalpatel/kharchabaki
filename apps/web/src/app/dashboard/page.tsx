@@ -34,7 +34,9 @@ export default function Dashboard() {
           className="truncate text-sm font-medium text-muted-foreground"
           title={session?.user.name}
         >
-          Welcome back, {session?.user.name.split(" ")[0] || "there"}
+          {session?.localOnly
+            ? "Saved on this device"
+            : `Welcome back, ${session?.user.name.split(" ")[0] || "there"}`}
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
           Your money

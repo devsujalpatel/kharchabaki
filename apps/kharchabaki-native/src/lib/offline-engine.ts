@@ -43,6 +43,7 @@ type Document = {
 };
 export type OfflineStatus = {
   ready: boolean;
+  syncEnabled: boolean;
   online: boolean;
   syncing: boolean;
   pending: number;
@@ -71,6 +72,121 @@ const emptyDocument = (): Document => ({
   outbox: [],
   lastSyncedAt: null,
 });
+const localDocument = (): Document => ({
+  ...emptyDocument(),
+  completeHistory: true,
+  balance: 0,
+  cache: {
+    "/preferences": {
+      success: true,
+      message: "Device preferences",
+      data: { currency: "INR", theme: "dark" },
+    },
+    "/loans/taken": { success: true, message: "Device loans", data: [] },
+    "/loans/given": { success: true, message: "Device loans", data: [] },
+  },
+});
+const dataKey = (account: string, syncEnabled: boolean) =>
+  `kharchabaki:${syncEnabled ? "data" : "local"}:v1:${account}`;
+function readDocument(saved: string): Document {
+  const document = JSON.parse(saved) as Document;
+  if (
+    !document ||
+    document.version !== 1 ||
+    !Array.isArray(document.outbox) ||
+    !Array.isArray(document.records) ||
+    !document.cache ||
+    typeof document.cache !== "object" ||
+    Array.isArray(document.cache) ||
+    typeof document.completeHistory !== "boolean" ||
+    (document.balance !== null &&
+      (typeof document.balance !== "number" || !Number.isFinite(document.balance)))
+  )
+    throw new Error("Saved data could not be read. Please retry.");
+  return document;
+}
+function seedLocalDocument(cloud: Document): Document {
+  const local = localDocument();
+  const projected = project(cloud);
+  local.records = clone(projected.records).map((row) => ({ ...row, pending: false }));
+  local.balance = (toCents(cloud.balance) + projected.delta) / 100;
+  const preferences = cloud.outbox
+    .filter((change) => change.path === "/preferences")
+    .reduce((value, change) => ({ ...value, ...change.body }), {
+      ...asObject(local.cache["/preferences"].data),
+      ...asObject(cloud.cache["/preferences"]?.data),
+    });
+  local.cache["/preferences"] = { success: true, message: "Device preferences", data: preferences };
+  for (const key of ["/loans/taken", "/loans/given"])
+    if (cloud.cache[key]) local.cache[key] = clone(cloud.cache[key]);
+  return local;
+}
+const sources = new Set(
+  "salary pocket-money gift investment bonus part-time freelance business rental interest dividends refund pension sale other invesment bonues".split(
+    " "
+  )
+);
+const categories = new Set(
+  "food travel shopping bills rent phone beauty clothing fuel gifts electronics snacks drinks vegetables fruits repairs health education entertainment groceries transport insurance subscriptions fitness pets childcare donations taxes other".split(
+    " "
+  )
+);
+function validateAmount(value: unknown, allowZero = false) {
+  const amount = Number(value);
+  if (
+    value === null ||
+    value === undefined ||
+    String(value).trim() === "" ||
+    !Number.isFinite(amount) ||
+    amount < (allowZero ? 0 : 0.01) ||
+    amount > 999999999999.99 ||
+    Math.abs(amount * 100 - Math.round(amount * 100)) > 0.001
+  )
+    throw new ApiError(
+      400,
+      `Enter ${allowZero ? "a nonnegative" : "a positive"} amount with up to two decimal places.`
+    );
+  return toCents(amount);
+}
+function validatePreferences(body: Record<string, unknown>) {
+  const next: Record<string, unknown> = {};
+  if (body.currency !== undefined) {
+    const currency = String(body.currency);
+    if (
+      !/^[A-Z]{3}$/.test(currency) ||
+      !(
+        typeof Intl.supportedValuesOf === "function"
+          ? Intl.supportedValuesOf("currency")
+          : [
+              "INR",
+              "USD",
+              "GBP",
+              "JPY",
+              "EUR",
+              "CAD",
+              "AUD",
+              "CNY",
+              "CHF",
+              "AED",
+              "SGD",
+              "NZD",
+              "KRW",
+              "BRL",
+              "ZAR",
+            ]
+      ).includes(currency)
+    )
+      throw new ApiError(400, "Choose a supported currency.");
+    next.currency = currency;
+  }
+  if (body.theme !== undefined) {
+    if (!["light", "dark", "ocean", "forest", "sunset", "rose"].includes(String(body.theme)))
+      throw new ApiError(400, "Choose a supported theme.");
+    next.theme = body.theme;
+  }
+  if (!Object.keys(next).length) throw new ApiError(400, "Choose a currency or theme.");
+  return next;
+}
 const keyFor = (path: string) => {
   const url = new URL(path.replace(/^\/api\/v1/, ""), "https://local.invalid");
   url.searchParams.sort();
@@ -187,11 +303,14 @@ export class OfflineClient {
   private account: string | null = null;
   private serial: Promise<unknown> = Promise.resolve();
   private flushing: Promise<void> | null = null;
+  private generation = 0;
   private listeners = new Set<() => void>();
-  private dataListeners = new Set<() => void>();
+  private dataListeners = new Set<(path?: string) => void>();
   private unauthorizedListeners = new Set<() => void>();
+  private syncDisabledListeners = new Set<() => void>();
   private snapshot: OfflineStatus = {
     ready: false,
+    syncEnabled: false,
     online: true,
     syncing: false,
     pending: 0,
@@ -209,7 +328,7 @@ export class OfflineClient {
       this.listeners.delete(listener);
     };
   };
-  onDataChange = (listener: () => void) => {
+  onDataChange = (listener: (path?: string) => void) => {
     this.dataListeners.add(listener);
     return () => {
       this.dataListeners.delete(listener);
@@ -221,38 +340,74 @@ export class OfflineClient {
       this.unauthorizedListeners.delete(listener);
     };
   };
+  onSyncDisabled = (listener: () => void) => {
+    this.syncDisabledListeners.add(listener);
+    return () => {
+      this.syncDisabledListeners.delete(listener);
+    };
+  };
   getSnapshot = () => this.snapshot;
   getPending = () => this.document.outbox;
   getAccount = () => this.account;
+  getCachedPreferences = (): Record<string, unknown> | null => {
+    if (!this.snapshot.ready || !this.document.cache["/preferences"]) return null;
+    return clone(asObject(this.local("/preferences").data));
+  };
+  private current(account: string | null, generation: number) {
+    return this.account === account && this.generation === generation;
+  }
+  private assertCurrent(account: string | null, generation: number) {
+    if (!this.current(account, generation))
+      throw new ApiError(409, "Your account or storage mode changed. Please try again.");
+  }
+  private async disableSync(account: string, generation: number) {
+    if (!this.current(account, generation)) return;
+    await this.activate(account, false);
+    if (this.account === account && this.snapshot.ready && !this.snapshot.syncEnabled)
+      this.syncDisabledListeners.forEach((listener) => listener());
+  }
   private publish(extra: Partial<OfflineStatus> = {}) {
-    this.snapshot = {
+    const next = {
       ...this.snapshot,
       pending: this.document.outbox.length,
       lastSyncedAt: this.document.lastSyncedAt,
       ...extra,
     };
+    if (
+      (Object.keys(next) as (keyof OfflineStatus)[]).every(
+        (key) => next[key] === this.snapshot[key]
+      )
+    )
+      return;
+    this.snapshot = next;
     this.listeners.forEach((listener) => listener());
   }
   private async persist(next: Document) {
     const account = this.account;
+    const generation = this.generation;
+    const syncEnabled = this.snapshot.syncEnabled;
     if (!account) throw new ApiError(401, "Please sign in to save changes.");
-    await this.storage.setItem(`kharchabaki:data:v1:${account}`, JSON.stringify(next));
-    if (this.account !== account) return;
+    await this.storage.setItem(dataKey(account, syncEnabled), JSON.stringify(next));
+    if (!this.current(account, generation)) return;
     this.document = next;
     this.publish();
   }
   private exclusive<T>(work: () => Promise<T>): Promise<T> {
     const account = this.account;
+    const generation = this.generation;
+    const syncEnabled = this.snapshot.syncEnabled;
     const run = async () => {
+      this.assertCurrent(account, generation);
       if (account && this.account === account && this.storage.runExclusive) {
-        const saved = await this.storage.getItem(`kharchabaki:data:v1:${account}`);
-        if (saved) this.document = JSON.parse(saved) as Document;
+        const saved = await this.storage.getItem(dataKey(account, syncEnabled));
+        this.assertCurrent(account, generation);
+        if (saved) this.document = readDocument(saved);
       }
       return work();
     };
     const next = this.serial.then(() =>
       this.storage.runExclusive && account
-        ? this.storage.runExclusive(`write:${account}`, run)
+        ? this.storage.runExclusive(`write:${syncEnabled ? "cloud" : "local"}:${account}`, run)
         : run()
     );
     this.serial = next.catch(() => {});
@@ -263,30 +418,59 @@ export class OfflineClient {
       this.publish();
     });
   }
-  async activate(account: string) {
-    if (this.account === account && this.snapshot.ready) return;
-    // Never let an old account's in-flight response update the next account's document.
-    await this.flushing;
-    await this.serial;
-    const saved = await this.storage.getItem(`kharchabaki:data:v1:${account}`);
-    const document = saved ? (JSON.parse(saved) as Document) : emptyDocument();
+  async activate(account: string, syncEnabled = false) {
     if (
-      document.version !== 1 ||
-      !Array.isArray(document.outbox) ||
-      !Array.isArray(document.records)
+      this.account === account &&
+      this.snapshot.ready &&
+      this.snapshot.syncEnabled === syncEnabled
     )
-      throw new Error("Saved data could not be read. Please retry.");
+      return;
+    // Revoke network access before any awaited disk work. In-flight responses belong to the old generation.
+    const generation = ++this.generation;
     this.account = account;
+    this.flushing = null;
+    this.document = syncEnabled ? emptyDocument() : localDocument();
+    this.publish({ ready: false, syncEnabled, syncing: false, error: null });
+    await this.serial;
+    if (!this.current(account, generation)) return;
+    const load = async () => {
+      this.assertCurrent(account, generation);
+      const saved = await this.storage.getItem(dataKey(account, syncEnabled));
+      this.assertCurrent(account, generation);
+      if (saved !== null) return readDocument(saved);
+      if (syncEnabled) return emptyDocument();
+      // Migrate only this account's existing device cache once. Its cloud outbox remains untouched.
+      const cloud = await this.storage.getItem(dataKey(account, true));
+      this.assertCurrent(account, generation);
+      const document = cloud !== null ? seedLocalDocument(readDocument(cloud)) : localDocument();
+      await this.storage.setItem(dataKey(account, false), JSON.stringify(document));
+      this.assertCurrent(account, generation);
+      return document;
+    };
+    let document: Document;
+    try {
+      document =
+        !syncEnabled && this.storage.runExclusive
+          ? await this.storage.runExclusive(`write:local:${account}`, load)
+          : await load();
+    } catch (error) {
+      if (!this.current(account, generation)) return;
+      throw error;
+    }
+    if (!this.current(account, generation)) return;
     this.document = document;
     this.publish({
       ready: true,
       error: document.outbox.find((item) => item.error)?.error ?? null,
     });
+    this.dataListeners.forEach((listener) => listener());
   }
   deactivate() {
+    ++this.generation;
+    this.flushing = null;
     this.account = null;
     this.document = emptyDocument();
-    this.publish({ ready: false, syncing: false, error: null });
+    this.publish({ ready: false, syncEnabled: false, syncing: false, error: null });
   }
   setOnline(online: boolean) {
     this.publish({ online });
@@ -299,6 +483,24 @@ export class OfflineClient {
     const url = new URL(key, "https://local.invalid");
     const saved = this.document.cache[key];
     const projected = project(this.document);
+    if (
+      (url.pathname === "/income" || url.pathname === "/expense") &&
+      this.document.completeHistory
+    ) {
+      const type = url.pathname.slice(1);
+      return {
+        success: true,
+        message: "Saved transactions",
+        offline: true,
+        data: projected.records
+          .filter((row) => row.type === type)
+          .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+          .map((row) => ({
+            ...row,
+            ...(type === "income" ? { receivedAt: row.occurredAt } : { spentAt: row.occurredAt }),
+          })),
+      };
+    }
     if (
       url.pathname === "/transactions" &&
       (this.document.completeHistory ||
@@ -431,6 +633,23 @@ export class OfflineClient {
         },
       };
     }
+    if (/^\/loans\/(taken|given)$/.test(url.pathname) && Array.isArray(saved.data))
+      return {
+        ...saved,
+        offline: true,
+        data: saved.data.map((value) => {
+          const loan = asObject(value);
+          return {
+            ...loan,
+            status:
+              Number(loan.paidAmount) >= Number(loan.totalAmount)
+                ? "paid"
+                : new Date(String(loan.dueDate)).getTime() < Date.now()
+                  ? "overdue"
+                  : "active",
+          };
+        }),
+      };
     return { ...saved, offline: true };
   }
   async request<T = Envelope>(path: string, init: RequestInit = {}): Promise<T> {
@@ -439,9 +658,12 @@ export class OfflineClient {
     const key = keyFor(path);
     const method = (init.method ?? "GET").toUpperCase();
     const account = this.account;
+    const generation = this.generation;
     if (method !== "GET") return this.write(key, method, init) as Promise<T>;
+    if (!this.snapshot.syncEnabled) return this.exclusive(async () => this.local(key) as T);
     if (this.document.outbox.length && this.snapshot.online) await this.flush();
-    if (this.snapshot.online && !this.document.outbox.length) {
+    this.assertCurrent(account, generation);
+    if (this.snapshot.syncEnabled && this.snapshot.online && !this.document.outbox.length) {
       let response: Response;
       try {
         response = await this.transport(key, {
@@ -449,11 +671,15 @@ export class OfflineClient {
           headers: { ...init.headers, "X-Account-ID": account },
         });
       } catch {
+        this.assertCurrent(account, generation);
         this.setOnline(false);
         return this.local(key) as T;
       }
-      if (this.account !== account)
-        throw new ApiError(401, "Your account changed. Please try again.");
+      this.assertCurrent(account, generation);
+      if (response.status === 403) {
+        await this.disableSync(account, generation);
+        throw new ApiError(403, "Cloud sync requires Premium. Device mode is available.");
+      }
       if (response.status === 401) {
         this.unauthorized();
         throw new ApiError(401, "Your session expired. Please sign in again.");
@@ -463,12 +689,13 @@ export class OfflineClient {
         return this.local(key) as T;
       }
       const result = (await response.json()) as Envelope;
+      this.assertCurrent(account, generation);
       if (!response.ok)
         throw new ApiError(response.status, result.message ?? "Could not load this view.");
       // Do not persist session tokens in the finance cache.
       if (key === "/me") return result as T;
       await this.exclusive(async () => {
-        if (this.account !== account) return;
+        this.assertCurrent(account, generation);
         const next = clone(this.document);
         next.cache[key] = result;
         if (key.split("?")[0] === "/transactions" && Array.isArray(result.data)) {
@@ -489,12 +716,15 @@ export class OfflineClient {
         next.lastSyncedAt = Date.now();
         await this.persist(next);
       });
+      this.assertCurrent(account, generation);
       return result as T;
     }
     return this.local(key) as T;
   }
   private async write(path: string, method: string, init: RequestInit): Promise<Envelope> {
     const account = this.account;
+    const generation = this.generation;
+    if (!this.snapshot.syncEnabled) return this.writeLocal(path, method, init);
     const supported =
       (method === "POST" && /^\/(income|expense)$/.test(path)) ||
       (["PATCH", "DELETE"].includes(method) && /^\/(income|expense)\/[\w-]+$/.test(path)) ||
@@ -506,14 +736,21 @@ export class OfflineClient {
         ...init,
         headers: { ...init.headers, "X-Account-ID": this.account! },
       }).catch(() => {
+        this.assertCurrent(account, generation);
         this.setOnline(false);
         throw new ApiError(0, "This action needs a connection. Please try again when online.");
       });
+      this.assertCurrent(account, generation);
+      if (response.status === 403) {
+        await this.disableSync(account!, generation);
+        throw new ApiError(403, "Cloud sync requires Premium. Device mode is available.");
+      }
       if (response.status === 401) {
         this.unauthorized();
         throw new ApiError(401, "Your session expired. Please sign in again.");
       }
       const result = (await response.json()) as Envelope;
+      this.assertCurrent(account, generation);
       if (!response.ok) throw new ApiError(response.status, result.message);
       return result;
     }
@@ -543,8 +780,7 @@ export class OfflineClient {
     };
     let cancelled = false;
     await this.exclusive(async () => {
-      if (this.account !== account)
-        throw new ApiError(401, "Your account changed. Please try again.");
+      this.assertCurrent(account, generation);
       const next = clone(this.document);
       const targetId = path.split("/")[2];
       const pendingCreate = next.outbox.find(
@@ -600,8 +836,10 @@ export class OfflineClient {
         error: next.outbox.find((item) => item.error)?.error ?? null,
       });
     });
-    this.dataListeners.forEach((listener) => listener());
-    if (this.snapshot.online) await this.flush();
+    this.assertCurrent(account, generation);
+    this.dataListeners.forEach((listener) => listener(path));
+    if (this.snapshot.syncEnabled && this.snapshot.online) await this.flush();
+    this.assertCurrent(account, generation);
     const queued = this.document.outbox.length > 0;
     return {
       success: true,
@@ -618,30 +856,245 @@ export class OfflineClient {
           : { id: body.id ?? path.split("/")[2], ...body },
     };
   }
+  private async writeLocal(path: string, method: string, init: RequestInit): Promise<Envelope> {
+    const account = this.account;
+    const generation = this.generation;
+    const body = init.body ? asObject(JSON.parse(String(init.body))) : {};
+    const createdAt = new Date().toISOString();
+    const result = await this.exclusive(async () => {
+      this.assertCurrent(account, generation);
+      const next = clone(this.document);
+      let data: unknown;
+      const transaction = /^\/(income|expense)(?:\/([\w-]+))?$/.exec(path);
+      const loanCreate = /^\/loans\/(taken|given)$/.exec(path);
+      const loanMutation = /^\/loans\/(taken|given)\/([\w-]+)$/.exec(path);
+      const loanPayment = /^\/loans\/(taken|given)\/([\w-]+)\/payments$/.exec(path);
+      if (
+        transaction &&
+        ((method === "POST" && !transaction[2]) ||
+          (["PATCH", "DELETE"].includes(method) && transaction[2]))
+      ) {
+        const type = transaction[1];
+        const id = method === "POST" ? String(body.id ?? this.uuid()) : transaction[2];
+        const previous = next.records.find((row) => row.id === id && row.type === type);
+        if (method !== "POST" && !previous)
+          throw new ApiError(404, "Transaction not found on this device.");
+        const input: Record<string, unknown> = { ...body, id };
+        if (method !== "DELETE") {
+          validateAmount(input.amount);
+          if (
+            !(type === "income" ? sources : categories).has(
+              String(type === "income" ? input.source : input.category)
+            )
+          )
+            throw new ApiError(400, "Choose a source or category.");
+          if (
+            input.description !== undefined &&
+            (typeof input.description !== "string" || input.description.length > 1000)
+          )
+            throw new ApiError(400, "Keep notes under 1000 characters.");
+          input.occurredAt ??= previous?.occurredAt ?? createdAt;
+          if (!Number.isFinite(new Date(String(input.occurredAt)).getTime()))
+            throw new ApiError(400, "Choose a valid date.");
+        }
+        const applied = apply(next.records, {
+          id: this.uuid(),
+          path,
+          method,
+          body: input,
+          createdAt,
+          attempted: false,
+        });
+        const balance = toCents(next.balance) + applied.delta;
+        if (applied.delta < 0 && balance < 0) throw new ApiError(400, "Insufficient balance.");
+        next.balance = balance / 100;
+        next.records = applied.records.map((row) => ({ ...row, pending: false }));
+        data =
+          method === "DELETE"
+            ? { id }
+            : next.records.find((row) => row.id === id && row.type === type);
+      } else if (path === "/preferences" && method === "PATCH") {
+        data = { ...asObject(next.cache[path]?.data), ...validatePreferences(body) };
+        next.cache[path] = { success: true, message: "Device preferences", data };
+      } else if (path === "/balance" && method === "POST") {
+        next.balance = validateAmount(body.amount, true) / 100;
+        data = { balance: next.balance };
+      } else if (loanCreate && method === "POST") {
+        const kind = loanCreate[1];
+        const amount = validateAmount(body.amount);
+        const interest = validateAmount(body.interest ?? 0, true);
+        const personKey = kind === "taken" ? "borrowedFrom" : "borrowerName";
+        const person = typeof body[personKey] === "string" ? String(body[personKey]).trim() : "";
+        if (!person || person.length > 100)
+          throw new ApiError(400, "Enter a person or bank name under 100 characters.");
+        const dueDate = new Date(String(body.dueDate));
+        if (!Number.isFinite(dueDate.getTime()))
+          throw new ApiError(400, "Choose a valid due date.");
+        const balance = toCents(next.balance) + (kind === "taken" ? amount : -amount);
+        if (balance < 0) throw new ApiError(400, "Insufficient balance.");
+        const loan = {
+          id: this.uuid(),
+          amount: (amount / 100).toFixed(2),
+          totalAmount: (Math.round((amount * (10000 + interest)) / 10000) / 100).toFixed(2),
+          paidAmount: "0.00",
+          interest: (interest / 100).toFixed(2),
+          [personKey]: person,
+          dueDate: dueDate.toISOString(),
+          status: dueDate.getTime() < Date.now() ? "overdue" : "active",
+          createdAt,
+          payments: [],
+        };
+        const loans = Array.isArray(next.cache[path]?.data)
+          ? (next.cache[path].data as unknown[])
+          : [];
+        next.cache[path] = { success: true, message: "Device loans", data: [loan, ...loans] };
+        next.balance = balance / 100;
+        data = loan;
+      } else if (loanMutation && ["PATCH", "DELETE"].includes(method)) {
+        const kind = loanMutation[1];
+        const loanId = loanMutation[2];
+        const key = `/loans/${kind}`;
+        const loans = Array.isArray(next.cache[key]?.data)
+          ? (next.cache[key].data as unknown[]).map(asObject)
+          : [];
+        const index = loans.findIndex((loan) => loan.id === loanId);
+        if (index < 0) throw new ApiError(404, "Loan not found on this device.");
+        const loan = loans[index];
+        if (method === "DELETE") {
+          const payments = Array.isArray(loan.payments) ? loan.payments.map(asObject) : [];
+          const paid = payments.reduce((sum, payment) => sum + toCents(payment.amount), 0);
+          const balance =
+            toCents(next.balance) +
+            (kind === "taken" ? -toCents(loan.amount) + paid : toCents(loan.amount) - paid);
+          if (balance < 0) throw new ApiError(400, "Insufficient balance to reverse this loan.");
+          loans.splice(index, 1);
+          next.balance = balance / 100;
+          data = { id: loanId };
+        } else {
+          const amount = validateAmount(body.amount);
+          const interest = validateAmount(body.interest ?? 0, true);
+          const personKey = kind === "taken" ? "borrowedFrom" : "borrowerName";
+          const person = typeof body[personKey] === "string" ? String(body[personKey]).trim() : "";
+          if (!person || person.length > 100)
+            throw new ApiError(400, "Enter a person or bank name under 100 characters.");
+          const dueDate = new Date(String(body.dueDate));
+          if (!Number.isFinite(dueDate.getTime()))
+            throw new ApiError(400, "Choose a valid due date.");
+          const total = Math.round((amount * (10000 + interest)) / 10000);
+          const paid = toCents(loan.paidAmount);
+          if (total < paid)
+            throw new ApiError(400, "Total amount cannot be less than payments already recorded.");
+          const balance =
+            toCents(next.balance) +
+            (kind === "taken" ? amount - toCents(loan.amount) : toCents(loan.amount) - amount);
+          if (balance < 0) throw new ApiError(400, "Insufficient balance.");
+          const updated = {
+            ...loan,
+            amount: (amount / 100).toFixed(2),
+            totalAmount: (total / 100).toFixed(2),
+            interest: (interest / 100).toFixed(2),
+            [personKey]: person,
+            dueDate: dueDate.toISOString(),
+            status: paid === total ? "paid" : dueDate.getTime() < Date.now() ? "overdue" : "active",
+          };
+          loans[index] = updated;
+          next.balance = balance / 100;
+          data = updated;
+        }
+        next.cache[key] = { success: true, message: "Device loans", data: loans };
+      } else if (loanPayment && method === "POST") {
+        const kind = loanPayment[1];
+        const loanId = loanPayment[2];
+        const key = `/loans/${kind}`;
+        const loans = Array.isArray(next.cache[key]?.data)
+          ? (next.cache[key].data as unknown[]).map(asObject)
+          : [];
+        const loan = loans.find((row) => row.id === loanId);
+        if (!loan) throw new ApiError(404, "Loan not found on this device.");
+        const amount = validateAmount(body.amount);
+        const paid = toCents(loan.paidAmount) + amount;
+        if (loan.status === "paid" || paid > toCents(loan.totalAmount))
+          throw new ApiError(400, "Payment exceeds the outstanding amount.");
+        const balance = toCents(next.balance) + (kind === "given" ? amount : -amount);
+        if (balance < 0) throw new ApiError(400, "Insufficient balance.");
+        const paidAt = new Date(String(body.paidAt ?? createdAt));
+        if (!Number.isFinite(paidAt.getTime()))
+          throw new ApiError(400, "Choose a valid payment date.");
+        const payment = {
+          id: this.uuid(),
+          loanId,
+          amount: (amount / 100).toFixed(2),
+          paidAt: paidAt.toISOString(),
+          createdAt,
+        };
+        loan.paidAmount = (paid / 100).toFixed(2);
+        loan.status =
+          paid === toCents(loan.totalAmount)
+            ? "paid"
+            : new Date(String(loan.dueDate)).getTime() < Date.now()
+              ? "overdue"
+              : "active";
+        loan.payments = [...(Array.isArray(loan.payments) ? loan.payments : []), payment];
+        next.cache[key] = { success: true, message: "Device loans", data: loans };
+        next.balance = balance / 100;
+        data = payment;
+      } else throw new ApiError(404, "This action is not available on this device.");
+      await this.persist(next);
+      this.assertCurrent(account, generation);
+      return {
+        success: true,
+        message: "Saved on this device",
+        data,
+        offline: true,
+        pending: false,
+      };
+    });
+    this.dataListeners.forEach((listener) => listener(path));
+    return result;
+  }
   async flush() {
+    if (!this.snapshot.syncEnabled || !this.snapshot.ready) return;
     if (this.flushing) return this.flushing;
     if (!this.snapshot.online || !this.account || !this.document.outbox.length) return;
     const account = this.account;
-    const work = () => this.runFlush(account);
-    this.flushing = (
+    const generation = this.generation;
+    const work = async () => {
+      try {
+        await this.runFlush(account, generation);
+      } catch (error) {
+        if (this.current(account, generation)) throw error;
+      }
+    };
+    const promise = (
       this.storage.runExclusive ? this.storage.runExclusive(`sync:${account}`, work) : work()
     ).finally(() => {
-      this.flushing = null;
-      this.publish({ syncing: false });
+      if (this.flushing === promise) this.flushing = null;
+      if (this.current(account, generation)) this.publish({ syncing: false });
     });
+    this.flushing = promise;
     return this.flushing;
   }
-  private async runFlush(account: string) {
+  private async runFlush(account: string, generation: number) {
+    if (!this.current(account, generation) || !this.snapshot.syncEnabled) return;
     await this.reload();
+    if (!this.current(account, generation) || !this.snapshot.syncEnabled) return;
     this.publish({ syncing: true, error: null });
-    while (this.snapshot.online && this.account === account && this.document.outbox.length) {
+    while (
+      this.snapshot.syncEnabled &&
+      this.snapshot.online &&
+      this.current(account, generation) &&
+      this.document.outbox.length
+    ) {
       const change = clone(this.document.outbox[0]);
       await this.exclusive(async () => {
-        if (this.account !== account) return;
+        if (!this.current(account, generation) || !this.snapshot.syncEnabled) return;
         const next = clone(this.document);
-        next.outbox[0].attempted = true;
+        const item = next.outbox.find((row) => row.id === change.id);
+        if (!item) return;
+        item.attempted = true;
         await this.persist(next);
       });
+      if (!this.current(account, generation) || !this.snapshot.syncEnabled) return;
       let response: Response;
       try {
         response = await this.transport(change.path, {
@@ -653,10 +1106,15 @@ export class OfflineClient {
           body: change.method === "DELETE" ? undefined : JSON.stringify(change.body),
         });
       } catch {
+        if (!this.current(account, generation)) return;
         this.setOnline(false);
         return;
       }
-      if (this.account !== account) return;
+      if (!this.current(account, generation) || !this.snapshot.syncEnabled) return;
+      if (response.status === 403) {
+        await this.disableSync(account, generation);
+        return;
+      }
       if (response.status === 401) {
         this.unauthorized();
         return;
@@ -668,9 +1126,10 @@ export class OfflineClient {
       const result = (await response
         .json()
         .catch(() => ({ message: "Could not sync this change." }))) as Envelope;
+      if (!this.current(account, generation) || !this.snapshot.syncEnabled) return;
       if (!response.ok && !(response.status === 404 && change.method === "DELETE")) {
         await this.exclusive(async () => {
-          if (this.account !== account) return;
+          if (!this.current(account, generation) || !this.snapshot.syncEnabled) return;
           const next = clone(this.document);
           const item = next.outbox.find((row) => row.id === change.id);
           if (item) item.error = result.message;
@@ -680,7 +1139,7 @@ export class OfflineClient {
         return;
       }
       await this.exclusive(async () => {
-        if (this.account !== account) return;
+        if (!this.current(account, generation) || !this.snapshot.syncEnabled) return;
         const next = clone(this.document);
         // Commit the same optimistic change into the saved base before removing it from the queue.
         const applied = apply(next.records, change);
@@ -710,15 +1169,18 @@ export class OfflineClient {
         next.lastSyncedAt = Date.now();
         await this.persist(next);
       });
-      this.dataListeners.forEach((listener) => listener());
+      if (this.current(account, generation))
+        this.dataListeners.forEach((listener) => listener(change.path));
     }
   }
   async discard(id: string) {
     if (this.snapshot.syncing) throw new Error("Wait for the current sync to finish.");
+    let path: string | undefined;
     await this.exclusive(async () => {
       const next = clone(this.document);
       const change = next.outbox.find((item) => item.id === id);
       if (!change) return;
+      path = change.path;
       if (change.attempted && !change.error)
         throw new Error(
           "This change may already be on the server. Reconnect to confirm it before discarding."
@@ -733,6 +1195,6 @@ export class OfflineClient {
         error: next.outbox.find((item) => item.error)?.error ?? null,
       });
     });
-    this.dataListeners.forEach((listener) => listener());
+    this.dataListeners.forEach((listener) => listener(path));
   }
 }

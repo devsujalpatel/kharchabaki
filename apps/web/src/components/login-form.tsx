@@ -1,6 +1,13 @@
 "use client";
 import { useState } from "react";
-import { ArrowRight, ShieldCheck, CloudUpload, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowRight,
+  ShieldCheck,
+  CloudUpload,
+  Loader2,
+  Smartphone,
+} from "lucide-react";
 import { offlineClient, sessionManager } from "@/lib/offline-client";
 import { authClient } from "@/lib/auth-client";
 import {
@@ -13,6 +20,7 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const router = useRouter();
   const session = useAppSession();
   const offline = useOfflineStatus();
   const [loading, setLoading] = useState(false);
@@ -93,6 +101,30 @@ export function LoginForm({
         {loading ? "Opening Google…" : "Continue with Google"}
         <ArrowRight className="ml-auto size-4" />
       </Button>
+      <Button
+        variant="outline"
+        className="mt-3 h-12 w-full rounded-xl"
+        disabled={loading}
+        onClick={async () => {
+          setLoading(true);
+          setError(null);
+          try {
+            await sessionManager.startOffline();
+            router.replace("/dashboard");
+          } catch (cause) {
+            setError(
+              cause instanceof Error
+                ? cause.message
+                : "Could not open device storage. Please retry.",
+            );
+          } finally {
+            setLoading(false);
+          }
+        }}
+      >
+        <Smartphone className="size-4" />
+        Offline only
+      </Button>
       {error && (
         <p role="alert" className="mt-3 text-sm text-destructive">
           {error}
@@ -101,11 +133,11 @@ export function LoginForm({
       <div className="mt-7 space-y-3 border-t pt-5 text-xs text-muted-foreground">
         <p className="flex items-center gap-2">
           <CloudUpload className="size-4 text-primary" />
-          Save offline. Sync when you&apos;re connected.
+          Free device storage. Cloud sync with Premium.
         </p>
         <p className="flex items-center gap-2">
           <ShieldCheck className="size-4 text-primary" />
-          Your history stays linked to your account.
+          Use without an account. Your data stays on this device.
         </p>
       </div>
     </div>

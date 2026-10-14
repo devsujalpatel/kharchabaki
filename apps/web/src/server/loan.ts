@@ -74,6 +74,38 @@ export async function createGivenLoan(
   });
 }
 
+export async function updateTakenLoan(
+  loanId: string,
+  data: CreateLoanInput & { borrowedFrom: string },
+): Promise<ApiResponse<TakenLoan>> {
+  return api<ApiResponse<TakenLoan>>(`/loans/taken/${loanId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateGivenLoan(
+  loanId: string,
+  data: CreateLoanInput & { borrowerName: string },
+): Promise<ApiResponse<GivenLoan>> {
+  return api<ApiResponse<GivenLoan>>(`/loans/given/${loanId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteTakenLoan(loanId: string): Promise<ApiResponse<{ id: string }>> {
+  return api<ApiResponse<{ id: string }>>(`/loans/taken/${loanId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function deleteGivenLoan(loanId: string): Promise<ApiResponse<{ id: string }>> {
+  return api<ApiResponse<{ id: string }>>(`/loans/given/${loanId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function recordTakenLoanPayment({
   loanId,
   amount,

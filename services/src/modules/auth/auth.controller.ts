@@ -1,17 +1,12 @@
 import { Request, Response } from 'express';
-import { fromNodeHeaders } from 'better-auth/node';
-import { auth } from '../../lib/auth.js';
 import { ApiError } from '../../utils/api-error.js';
 import { ApiResponse } from '../../types/common.types.js';
 
 export const getUserSession = async (request: Request, response: Response) => {
-  const session = await auth.api.getSession({
-    headers: fromNodeHeaders(request.headers),
-  });
-
-  if (!session) {
+  if (!request.auth || !request.session) {
     throw new ApiError(401, 'Unauthorized');
   }
+  const session = { user: request.auth, session: request.session };
 
   const body: ApiResponse<{
     session: typeof session;

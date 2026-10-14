@@ -9,6 +9,7 @@ import {
   RotateCw,
   Trash2,
   WifiOff,
+  Smartphone,
 } from "lucide-react";
 import { useOfflineStatus } from "@/components/providers/session-provider";
 import { offlineClient, sessionManager } from "@/lib/offline-client";
@@ -21,8 +22,9 @@ export function SyncStatus() {
   const status = useOfflineStatus();
   const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const Icon =
-    status.error || error
+  const Icon = !status.syncEnabled
+    ? Smartphone
+    : status.error || error
       ? AlertTriangle
       : status.syncing
         ? Loader2
@@ -31,8 +33,9 @@ export function SyncStatus() {
           : status.pending
             ? CloudUpload
             : CloudCheck;
-  const title =
-    status.error || error
+  const title = !status.syncEnabled
+    ? "On this device"
+    : status.error || error
       ? "Needs review"
       : status.syncing
         ? "Syncing"
@@ -48,6 +51,7 @@ export function SyncStatus() {
       })
     : null;
   async function retry() {
+    if (!status.syncEnabled) return;
     try {
       setError(null);
       offlineClient.setOnline(true);
@@ -91,13 +95,15 @@ export function SyncStatus() {
             <div className="rounded-2xl bg-muted/40 p-4">
               <p className="text-sm font-semibold">{title}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {!status.online
-                  ? "Your changes are saved on this device."
-                  : status.pending
-                    ? "Changes sync when you're connected."
-                    : savedAt
-                      ? `Everything is up to date · ${savedAt}`
-                      : "Everything is up to date"}
+                {!status.syncEnabled
+                  ? "Your data stays on this device. Cloud sync requires Premium."
+                  : !status.online
+                    ? "Your changes are saved on this device."
+                    : status.pending
+                      ? "Changes sync when you're connected."
+                      : savedAt
+                        ? `Everything is up to date · ${savedAt}`
+                        : "Everything is up to date"}
               </p>
             </div>
             {(error || status.error) && (
@@ -159,21 +165,22 @@ export function SyncStatus() {
                 ))}
               </div>
             )}
-            {(status.pending > 0 ||
-              !status.online ||
-              status.error ||
-              error) && (
-              <Button
-                className="h-11 w-full rounded-xl"
-                disabled={status.syncing}
-                onClick={retry}
-              >
-                <RotateCw
-                  className={cn("size-4", status.syncing && "animate-spin")}
-                />
-                {status.syncing ? "Syncing" : "Sync now"}
-              </Button>
-            )}
+            {status.syncEnabled &&
+              (status.pending > 0 ||
+                !status.online ||
+                status.error ||
+                error) && (
+                <Button
+                  className="h-11 w-full rounded-xl"
+                  disabled={status.syncing}
+                  onClick={retry}
+                >
+                  <RotateCw
+                    className={cn("size-4", status.syncing && "animate-spin")}
+                  />
+                  {status.syncing ? "Syncing" : "Sync now"}
+                </Button>
+              )}
           </div>
         </FormDialog>
       )}

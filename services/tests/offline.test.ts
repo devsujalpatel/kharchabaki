@@ -146,7 +146,7 @@ function fixture(storage = new MemoryStorage()) {
   };
 }
 async function prime(f: ReturnType<typeof fixture>) {
-  await f.client.activate('account-a');
+  await f.client.activate('account-a', true);
   for (const path of ['/transactions', '/summary', '/balance', '/preferences'])
     await f.client.request(path);
 }
@@ -227,7 +227,7 @@ test('offline writes survive restart and update history, totals, and balance', a
   await f.client.request('/expense', expense(10.1));
   const restored = new OfflineClient(f.storage, f.transport, f.uuid);
   restored.setOnline(false);
-  await restored.activate('account-a');
+  await restored.activate('account-a', true);
   assert.equal(
     (await rows(restored, '/transactions?month=2026-10&type=income')).length,
     1,
@@ -355,10 +355,10 @@ test('accounts have separate saved histories and queues', async () => {
   f.network(false);
   await f.client.request('/income', income(50));
   f.client.deactivate();
-  await f.client.activate('account-b');
+  await f.client.activate('account-b', true);
   assert.equal(f.client.getSnapshot().pending, 0);
   await assert.rejects(f.client.request('/transactions'));
-  await f.client.activate('account-a');
+  await f.client.activate('account-a', true);
   assert.equal(f.client.getSnapshot().pending, 1);
 });
 test('failed persistence never reports a write as saved', async () => {
@@ -404,7 +404,7 @@ test("two tabs cannot overwrite each other's queue or concurrently replay it", a
     () => '00000000-0000-4000-8000-999999999999',
   );
   second.setOnline(false);
-  await second.activate('account-a');
+  await second.activate('account-a', true);
   await Promise.all([
     f.client.request('/income', income(50)),
     second.request('/expense', expense(10)),
@@ -455,7 +455,7 @@ test('session expiry retains unsynced work for the same account', async () => {
   const session = new SessionManager(f.storage, f.client, f.transport);
   await session.expire();
   assert.equal(session.getSnapshot().data, null);
-  await f.client.activate('account-a');
+  await f.client.activate('account-a', true);
   assert.equal(f.client.getSnapshot().pending, 1);
 });
 test('session snapshots omit authentication tokens', async () => {
@@ -534,4 +534,638 @@ test('account cache resets happen before the restored session becomes visible', 
   assert.deepEqual(previous, [null]);
   await manager.expire();
   assert.deepEqual(previous, [null, 'account-a']);
+});
+
+function deviceFixture(storage = new MemoryStorage()) {
+  let count = 0;
+  const calls: string[] = [];
+  const client = new OfflineClient(
+    storage,
+    async (path) => {
+      calls.push(path);
+      throw new Error('Device mode must not use the network');
+    },
+    () => `00000000-0000-4000-8000-${String(++count).padStart(12, '0')}`,
+  );
+  return { client, storage, calls };
+}
+test('activation defaults to a complete device workspace and never sends online reads', async () => {
+  const f = deviceFixture();
+  await f.client.activate('local:device');
+  assert.equal(f.client.getSnapshot().syncEnabled, false);
+  assert.equal(f.client.getSnapshot().ready, true);
+  assert.deepEqual(f.client.getCachedPreferences(), {
+    currency: 'INR',
+    theme: 'dark',
+  });
+  assert.deepEqual(await rows(f.client), []);
+  assert.deepEqual(await data(f.client, '/balance'), { balance: 0 });
+  assert.deepEqual(await data(f.client, '/preferences'), {
+    currency: 'INR',
+    theme: 'dark',
+  });
+  for (const path of ['/income', '/expense', '/loans/taken', '/loans/given'])
+    assert.deepEqual((await f.client.request<Envelope>(path)).data, []);
+  const summary = await data(f.client, '/summary?month=2026-02');
+  assert.equal(summary.balance, '0.00');
+  assert.equal(summary.income, '0.00');
+  assert.equal(summary.expense, '0.00');
+  assert.equal((summary.daily as unknown[]).length, 28);
+  assert.equal((summary.monthly as unknown[]).length, 6);
+  await f.client.flush();
+  assert.deepEqual(f.calls, []);
+});
+test('device transactions, edits, dates, preferences and opening balance survive restart without an outbox', async () => {
+  const f = deviceFixture();
+  await f.client.activate('account-free');
+  await f.client.request('/balance', {
+    method: 'POST',
+    body: JSON.stringify({ amount: 100 }),
+  });
+  const saved = await f.client.request<Envelope>('/income', income(25.15));
+  assert.equal(saved.pending, false);
+  const id = String((saved.data as SavedTransaction).id);
+  await f.client.request('/expense', expense(10.1));
+  await f.client.request(`/income/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      amount: 30.15,
+      source: 'freelance',
+      description: 'A long project',
+      occurredAt: '2026-09-30T00:00:00.000Z',
+    }),
+  });
+  await f.client.request('/preferences', {
+    method: 'PATCH',
+    body: JSON.stringify({ currency: 'JPY', theme: 'forest' }),
+  });
+  assert.deepEqual(f.client.getCachedPreferences(), {
+    currency: 'JPY',
+    theme: 'forest',
+  });
+  assert.equal(f.client.getSnapshot().pending, 0);
+  assert.deepEqual(f.client.getPending(), []);
+  const restored = deviceFixture(f.storage);
+  restored.client.setOnline(false);
+  await restored.client.activate('account-free');
+  const previous = await rows(
+    restored.client,
+    '/transactions?month=2026-09&type=income&category=freelance&search=project',
+  );
+  assert.equal(previous.length, 1);
+  assert.equal(previous[0].pending, false);
+  const october = await data(restored.client, '/summary?month=2026-10');
+  assert.equal(october.income, '0.00');
+  assert.equal(october.expense, '10.10');
+  assert.equal(october.balance, '120.05');
+  assert.equal(
+    (await data(restored.client, '/summary?month=2026-09')).income,
+    '30.15',
+  );
+  await restored.client.request(`/income/${id}`, { method: 'DELETE' });
+  assert.equal((await data(restored.client, '/balance')).balance, 89.9);
+  assert.deepEqual(await data(restored.client, '/preferences'), {
+    currency: 'JPY',
+    theme: 'forest',
+  });
+  assert.deepEqual([...f.calls, ...restored.calls], []);
+});
+test('device borrowing, lending and interest repayments update balances and persist payment history', async () => {
+  const f = deviceFixture();
+  await f.client.activate('local:device');
+  f.client.setOnline(false);
+  const borrowed = await f.client.request<Envelope>('/loans/taken', {
+    method: 'POST',
+    body: JSON.stringify({
+      amount: '100.10',
+      interest: '10',
+      borrowedFrom: 'Bank',
+      dueDate: '2099-01-01',
+    }),
+  });
+  const borrowedLoan = borrowed.data as Record<string, unknown>;
+  assert.equal(borrowed.pending, false);
+  assert.equal(borrowedLoan.totalAmount, '110.11');
+  assert.equal((await data(f.client, '/balance')).balance, 100.1);
+  const lent = await f.client.request<Envelope>('/loans/given', {
+    method: 'POST',
+    body: JSON.stringify({
+      amount: '40.00',
+      interest: '5',
+      borrowerName: 'Alex',
+      dueDate: '2020-01-01',
+    }),
+  });
+  const lentLoan = lent.data as Record<string, unknown>;
+  assert.equal(lentLoan.totalAmount, '42.00');
+  assert.equal(lentLoan.status, 'overdue');
+  assert.equal((await data(f.client, '/balance')).balance, 60.1);
+  const paymentPath = `/loans/given/${lentLoan.id}/payments`;
+  const payment = await f.client.request<Envelope>(paymentPath, {
+    method: 'POST',
+    body: JSON.stringify({ amount: '42.00' }),
+  });
+  assert.equal((payment.data as Record<string, unknown>).loanId, lentLoan.id);
+  assert.equal((await data(f.client, '/balance')).balance, 102.1);
+  await f.client.request(`/loans/taken/${borrowedLoan.id}/payments`, {
+    method: 'POST',
+    body: JSON.stringify({ amount: '50' }),
+  });
+  assert.equal((await data(f.client, '/balance')).balance, 52.1);
+  const restored = deviceFixture(f.storage);
+  await restored.client.activate('local:device');
+  const given = (await restored.client.request<Envelope>('/loans/given'))
+    .data as Record<string, unknown>[];
+  const taken = (await restored.client.request<Envelope>('/loans/taken'))
+    .data as Record<string, unknown>[];
+  assert.equal(given[0].status, 'paid');
+  assert.equal(given[0].paidAmount, '42.00');
+  assert.equal((given[0].payments as unknown[]).length, 1);
+  assert.equal(taken[0].paidAmount, '50.00');
+  assert.equal((taken[0].payments as unknown[]).length, 1);
+  assert.equal(restored.client.getSnapshot().pending, 0);
+  assert.deepEqual([...f.calls, ...restored.calls], []);
+});
+test('device loan edits preserve payments and balance, while deletes reverse full loan effects', async () => {
+  const f = deviceFixture();
+  await f.client.activate('local:device');
+  const taken = (
+    await f.client.request<Envelope>('/loans/taken', {
+      method: 'POST',
+      body: JSON.stringify({
+        amount: '100',
+        interest: '10',
+        borrowedFrom: 'Bank',
+        dueDate: '2099-01-01',
+      }),
+    })
+  ).data as Record<string, unknown>;
+  await f.client.request(`/loans/taken/${taken.id}/payments`, {
+    method: 'POST',
+    body: JSON.stringify({ amount: '25' }),
+  });
+  const edited = (
+    await f.client.request<Envelope>(`/loans/taken/${taken.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        amount: '120',
+        interest: '0',
+        borrowedFrom: 'Credit union',
+        dueDate: '2099-02-01',
+      }),
+    })
+  ).data as Record<string, unknown>;
+  assert.equal(edited.amount, '120.00');
+  assert.equal(edited.totalAmount, '120.00');
+  assert.equal(edited.paidAmount, '25.00');
+  assert.equal((edited.payments as unknown[]).length, 1);
+  assert.equal((await data(f.client, '/balance')).balance, 95);
+  await assert.rejects(
+    f.client.request(`/loans/taken/${taken.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        amount: '20',
+        interest: '0',
+        borrowedFrom: 'Credit union',
+        dueDate: '2099-02-01',
+      }),
+    }),
+    /less than payments already recorded/,
+  );
+  await f.client.request(`/loans/taken/${taken.id}`, { method: 'DELETE' });
+  assert.equal((await data(f.client, '/balance')).balance, 0);
+  assert.deepEqual(await data(f.client, '/loans/taken'), []);
+
+  await f.client.request('/balance', {
+    method: 'POST',
+    body: JSON.stringify({ amount: 200 }),
+  });
+  const given = (
+    await f.client.request<Envelope>('/loans/given', {
+      method: 'POST',
+      body: JSON.stringify({
+        amount: '50',
+        interest: '10',
+        borrowerName: 'Alex',
+        dueDate: '2099-01-01',
+      }),
+    })
+  ).data as Record<string, unknown>;
+  await f.client.request(`/loans/given/${given.id}/payments`, {
+    method: 'POST',
+    body: JSON.stringify({ amount: '20' }),
+  });
+  await f.client.request(`/loans/given/${given.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      amount: '60',
+      interest: '0',
+      borrowerName: 'Alex Kim',
+      dueDate: '2099-03-01',
+    }),
+  });
+  assert.equal((await data(f.client, '/balance')).balance, 160);
+  await f.client.request(`/loans/given/${given.id}`, { method: 'DELETE' });
+  assert.equal((await data(f.client, '/balance')).balance, 200);
+  assert.deepEqual(await data(f.client, '/loans/given'), []);
+});
+test('device borrowed loan deletion is blocked when reversing payments would make balance negative', async () => {
+  const f = deviceFixture();
+  await f.client.activate('local:device');
+  const taken = (
+    await f.client.request<Envelope>('/loans/taken', {
+      method: 'POST',
+      body: JSON.stringify({
+        amount: '20',
+        borrowedFrom: 'Bank',
+        dueDate: '2099-01-01',
+      }),
+    })
+  ).data as Record<string, unknown>;
+  await f.client.request(`/loans/taken/${taken.id}/payments`, {
+    method: 'POST',
+    body: JSON.stringify({ amount: '10' }),
+  });
+  await f.client.request('/expense', {
+    method: 'POST',
+    body: JSON.stringify({ amount: '5', category: 'food' }),
+  });
+  await assert.rejects(
+    f.client.request(`/loans/taken/${taken.id}`, { method: 'DELETE' }),
+    /Insufficient balance to reverse this loan/,
+  );
+  assert.equal((await data(f.client, '/balance')).balance, 5);
+  assert.equal(((await data(f.client, '/loans/taken')) as unknown[]).length, 1);
+});
+test('device validation rejects invalid money, overspending, overpayment and failed persistence atomically', async () => {
+  const f = deviceFixture();
+  await f.client.activate('local:device');
+  await assert.rejects(
+    f.client.request('/expense', expense(1)),
+    /Insufficient balance/,
+  );
+  await assert.rejects(
+    f.client.request('/income', {
+      method: 'POST',
+      body: JSON.stringify({ amount: 1, source: 'unknown' }),
+    }),
+    /source or category/,
+  );
+  for (const amount of [-1, 1.001, null, ''])
+    await assert.rejects(
+      f.client.request('/balance', {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+      }),
+      /amount/,
+    );
+  await f.client.request('/balance', {
+    method: 'POST',
+    body: JSON.stringify({ amount: 10 }),
+  });
+  await assert.rejects(
+    f.client.request('/loans/given', {
+      method: 'POST',
+      body: JSON.stringify({
+        amount: '11',
+        borrowerName: 'Alex',
+        dueDate: '2099-01-01',
+      }),
+    }),
+    /Insufficient balance/,
+  );
+  const loan = (
+    await f.client.request<Envelope>('/loans/taken', {
+      method: 'POST',
+      body: JSON.stringify({
+        amount: '20',
+        borrowedFrom: 'Bank',
+        dueDate: '2099-01-01',
+      }),
+    })
+  ).data as Record<string, unknown>;
+  await assert.rejects(
+    f.client.request(`/loans/taken/${loan.id}/payments`, {
+      method: 'POST',
+      body: JSON.stringify({ amount: '20.01' }),
+    }),
+    /outstanding amount/,
+  );
+  await assert.rejects(
+    f.client.request('/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify({ theme: 'unknown' }),
+    }),
+    /theme/,
+  );
+  f.storage.fail = true;
+  await assert.rejects(f.client.request('/income', income(5)), /Disk is full/);
+  assert.deepEqual(await rows(f.client), []);
+  assert.equal((await data(f.client, '/balance')).balance, 30);
+  assert.equal(f.client.getSnapshot().pending, 0);
+  assert.deepEqual(f.calls, []);
+});
+test('device accounts and premium workspaces stay isolated across entitlement changes', async () => {
+  const f = fixture();
+  await prime(f);
+  f.network(false);
+  await f.client.request('/income', income(50));
+  await f.client.activate('account-a', false);
+  assert.equal(f.client.getSnapshot().pending, 0);
+  assert.equal((await data(f.client, '/balance')).balance, 550);
+  await f.client.request('/income', income(7));
+  await f.client.activate('account-b');
+  assert.equal((await rows(f.client)).length, 0);
+  await f.client.activate('account-a', true);
+  assert.equal(f.client.getSnapshot().pending, 1);
+  assert.equal((await data(f.client, '/balance')).balance, 550);
+  assert.equal((await rows(f.client))[0].amount, '50.00');
+  await f.client.activate('account-a');
+  assert.equal((await data(f.client, '/balance')).balance, 557);
+  assert.equal(
+    (await rows(f.client)).find((row) => row.amount === '7.00')?.amount,
+    '7.00',
+  );
+  assert.equal(f.writes.length, 0);
+});
+test('downgrade stops a running flush without waiting for transport and retains its original queue', async () => {
+  const f = fixture();
+  await prime(f);
+  f.network(false);
+  await f.client.request('/income', income(50));
+  await f.client.request('/expense', expense(20));
+  let started!: () => void;
+  let complete!: () => void;
+  const sending = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const blocked = new Promise<void>((resolve) => {
+    complete = resolve;
+  });
+  let calls = 0;
+  const client = new OfflineClient(
+    f.storage,
+    async (path, init) => {
+      calls++;
+      started();
+      await blocked;
+      return f.transport(path, init);
+    },
+    f.uuid,
+  );
+  await client.activate('account-a', true);
+  f.network(true);
+  const flushing = client.flush();
+  await sending;
+  await client.activate('account-a');
+  assert.equal(client.getSnapshot().syncEnabled, false);
+  assert.equal(client.getSnapshot().syncing, false);
+  await client.request('/income', income(7));
+  await client.flush();
+  assert.equal(calls, 1);
+  complete();
+  await flushing;
+  assert.equal((await data(client, '/balance')).balance, 537);
+  assert.equal(client.getSnapshot().lastSyncedAt, null);
+  client.setOnline(false);
+  await client.activate('account-a', true);
+  assert.equal(client.getSnapshot().pending, 2);
+  assert.equal((await data(client, '/balance')).balance, 530);
+  client.setOnline(true);
+  await client.flush();
+  assert.equal(f.balance(), 530);
+  assert.equal(f.records.length, 2);
+  assert.equal(client.getSnapshot().pending, 0);
+  await client.activate('account-a');
+  assert.equal((await data(client, '/balance')).balance, 537);
+});
+test('a stale cloud read cannot overwrite the local workspace after downgrade', async () => {
+  const f = deviceFixture();
+  let started!: () => void;
+  let complete!: (response: Response) => void;
+  const sending = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const delayed = new Promise<Response>((resolve) => {
+    complete = resolve;
+  });
+  const client = new OfflineClient(
+    f.storage,
+    () => {
+      started();
+      return delayed;
+    },
+    () => 'id',
+  );
+  await client.activate('account-a', true);
+  const reading = client.request('/balance');
+  await sending;
+  await client.activate('account-a');
+  await client.request('/balance', {
+    method: 'POST',
+    body: JSON.stringify({ amount: 12 }),
+  });
+  complete(json({ balance: 999 }));
+  await assert.rejects(reading, /storage mode changed/);
+  assert.equal((await data(client, '/balance')).balance, 12);
+  assert.equal(f.storage.data.has('kharchabaki:data:v1:account-a'), false);
+});
+test('a forbidden cloud response disables all further finance sends and preserves queued work', async () => {
+  const f = fixture();
+  await prime(f);
+  f.network(false);
+  await f.client.request('/income', income(10));
+  let calls = 0;
+  const client = new OfflineClient(
+    f.storage,
+    async () => {
+      calls++;
+      return json(null, 403);
+    },
+    f.uuid,
+  );
+  await client.activate('account-a', true);
+  await client.flush();
+  assert.equal(client.getSnapshot().syncEnabled, false);
+  assert.equal(calls, 1);
+  await client.request('/income', income(3));
+  await client.request('/balance');
+  await client.flush();
+  assert.equal(calls, 1);
+  client.setOnline(false);
+  await client.activate('account-a', true);
+  assert.equal(client.getSnapshot().pending, 1);
+  await client.activate('account-a');
+  assert.equal((await data(client, '/balance')).balance, 513);
+});
+test('concurrent device writes reload the active workspace under a storage lock', async () => {
+  const f = deviceFixture();
+  const second = new OfflineClient(
+    f.storage,
+    async () => {
+      throw new Error('Network called');
+    },
+    () => '00000000-0000-4000-8000-999999999999',
+  );
+  await f.client.activate('local:device');
+  await second.activate('local:device');
+  await Promise.all([
+    f.client.request('/income', income(10)),
+    second.request('/income', income(20)),
+  ]);
+  await f.client.reload();
+  assert.equal((await rows(f.client)).length, 2);
+  assert.equal((await data(f.client, '/balance')).balance, 30);
+  assert.equal(f.client.getSnapshot().pending, 0);
+});
+
+test('forbidden sync notifications observe the ready local document and can unsubscribe', async () => {
+  const f = fixture();
+  await prime(f);
+  await f.client.activate('account-a');
+  await f.client.request('/preferences', {
+    method: 'PATCH',
+    body: JSON.stringify({ theme: 'rose', currency: 'GBP' }),
+  });
+  let calls = 0;
+  const client = new OfflineClient(
+    f.storage,
+    async () => json(null, 403),
+    f.uuid,
+  );
+  await client.activate('account-a', true);
+  const unsubscribe = client.onSyncDisabled(() => {
+    calls++;
+    assert.equal(client.getSnapshot().ready, true);
+    assert.equal(client.getSnapshot().syncEnabled, false);
+    assert.deepEqual(client.getCachedPreferences(), {
+      theme: 'rose',
+      currency: 'GBP',
+    });
+  });
+  await assert.rejects(
+    client.request('/balance'),
+    (error) => error instanceof ApiError && error.status === 403,
+  );
+  assert.equal(calls, 1);
+  unsubscribe();
+  await client.activate('account-a', true);
+  await assert.rejects(
+    client.request('/balance'),
+    (error) => error instanceof ApiError && error.status === 403,
+  );
+  assert.equal(calls, 1);
+});
+test('rapid device preference choices persist the final choice and notify only its query family', async () => {
+  const f = deviceFixture();
+  await f.client.activate('local:device');
+  const changed: (string | undefined)[] = [];
+  f.client.onDataChange((path) => changed.push(path));
+  await Promise.all(
+    ['ocean', 'forest', 'rose'].map((theme) =>
+      f.client.request('/preferences', {
+        method: 'PATCH',
+        body: JSON.stringify({ theme }),
+      }),
+    ),
+  );
+  assert.deepEqual(f.client.getCachedPreferences(), {
+    currency: 'INR',
+    theme: 'rose',
+  });
+  assert.deepEqual(changed, ['/preferences', '/preferences', '/preferences']);
+  const restored = deviceFixture(f.storage);
+  await restored.client.activate('local:device');
+  assert.deepEqual(restored.client.getCachedPreferences(), {
+    currency: 'INR',
+    theme: 'rose',
+  });
+  assert.equal(f.client.getSnapshot().pending, 0);
+  assert.deepEqual(f.calls, []);
+});
+
+test('first device activation copies only that account cached projection once and preserves its cloud outbox', async () => {
+  const f = fixture();
+  await prime(f);
+  f.network(false);
+  await f.client.request('/income', income(50));
+  await f.client.request('/preferences', {
+    method: 'PATCH',
+    body: JSON.stringify({ currency: 'USD', theme: 'ocean' }),
+  });
+  const cloudKey = 'kharchabaki:data:v1:account-a';
+  const cloud = JSON.parse(f.storage.data.get(cloudKey)!);
+  const cachedLoan = {
+    id: 'loan-1',
+    amount: '10.00',
+    totalAmount: '10.00',
+    paidAmount: '0.00',
+    interest: '0.00',
+    borrowedFrom: 'Bank',
+    dueDate: '2099-01-01T00:00:00.000Z',
+    status: 'active',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    payments: [],
+  };
+  cloud.cache['/loans/taken'] = {
+    success: true,
+    message: 'Saved loans',
+    data: [cachedLoan],
+  };
+  f.storage.data.set(cloudKey, JSON.stringify(cloud));
+  const original = f.storage.data.get(cloudKey);
+  await f.client.activate('account-a');
+  assert.equal((await data(f.client, '/balance')).balance, 550);
+  const copied = await rows(f.client);
+  assert.equal(copied.length, 1);
+  assert.equal(copied[0].pending, false);
+  assert.equal(f.client.getSnapshot().pending, 0);
+  assert.deepEqual(f.client.getCachedPreferences(), {
+    currency: 'USD',
+    theme: 'ocean',
+  });
+  assert.deepEqual((await f.client.request<Envelope>('/loans/taken')).data, [
+    cachedLoan,
+  ]);
+  assert.equal(f.storage.data.get(cloudKey), original);
+  await f.client.request('/income', income(7));
+  await f.client.activate('account-b');
+  assert.equal((await data(f.client, '/balance')).balance, 0);
+  assert.deepEqual(await rows(f.client), []);
+  assert.deepEqual(f.client.getCachedPreferences(), {
+    currency: 'INR',
+    theme: 'dark',
+  });
+  await f.client.activate('local:device');
+  assert.deepEqual(await rows(f.client), []);
+  await f.client.activate('account-a', true);
+  assert.equal(f.client.getSnapshot().pending, 2);
+  assert.equal((await data(f.client, '/balance')).balance, 550);
+  await f.client.request('/income', income(30));
+  await f.client.activate('account-a');
+  assert.equal((await data(f.client, '/balance')).balance, 557);
+  assert.equal((await rows(f.client)).length, 2);
+  assert.equal(f.client.getSnapshot().pending, 0);
+  assert.equal(f.writes.length, 0);
+});
+test('invalid saved documents fail activation without replacing them or falling back to another mode', async () => {
+  const f = deviceFixture();
+  const localKey = 'kharchabaki:local:v1:account-a';
+  const cloudKey = 'kharchabaki:data:v1:account-a';
+  f.storage.data.set(
+    cloudKey,
+    JSON.stringify({ version: 1, records: [], outbox: [] }),
+  );
+  await assert.rejects(
+    f.client.activate('account-a'),
+    /Saved data could not be read/,
+  );
+  assert.equal(f.storage.data.has(localKey), false);
+  f.storage.data.set(localKey, 'null');
+  await assert.rejects(
+    f.client.activate('account-a'),
+    /Saved data could not be read/,
+  );
+  assert.equal(f.storage.data.get(localKey), 'null');
+  assert.deepEqual(f.calls, []);
 });

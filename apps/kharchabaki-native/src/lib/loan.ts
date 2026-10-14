@@ -108,6 +108,48 @@ export async function createGivenLoan(
   return response.json();
 }
 
+export async function updateTakenLoan(
+  loanId: string,
+  data: CreateLoanInput & { borrowedFrom: string }
+): Promise<ApiResponse<TakenLoan>> {
+  const response = await api(`/api/v1/loans/taken/${loanId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message ?? "Failed to update loan");
+  return result;
+}
+
+export async function updateGivenLoan(
+  loanId: string,
+  data: CreateLoanInput & { borrowerName: string }
+): Promise<ApiResponse<GivenLoan>> {
+  const response = await api(`/api/v1/loans/given/${loanId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message ?? "Failed to update loan");
+  return result;
+}
+
+export async function deleteTakenLoan(loanId: string): Promise<ApiResponse<{ id: string }>> {
+  const response = await api(`/api/v1/loans/taken/${loanId}`, { method: "DELETE" });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message ?? "Failed to delete loan");
+  return result;
+}
+
+export async function deleteGivenLoan(loanId: string): Promise<ApiResponse<{ id: string }>> {
+  const response = await api(`/api/v1/loans/given/${loanId}`, { method: "DELETE" });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message ?? "Failed to delete loan");
+  return result;
+}
+
 export async function recordTakenLoanPayment({
   loanId,
   amount,

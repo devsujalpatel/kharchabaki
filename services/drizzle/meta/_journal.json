@@ -64,6 +64,13 @@
       "when": 1791834561489,
       "tag": "0008_monthly_history_preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791961689076,
+      "tag": "0009_premium_entitlement",
+      "breakpoints": true
     }
   ]
 }

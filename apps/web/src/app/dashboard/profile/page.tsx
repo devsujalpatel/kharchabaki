@@ -1,8 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { sessionManager } from "@/lib/offline-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, Mail, Pencil, Wallet } from "lucide-react";
+import {
+  Check,
+  Loader2,
+  LogIn,
+  Mail,
+  Pencil,
+  Smartphone,
+  Wallet,
+} from "lucide-react";
 import {
   useAppSession,
   useOfflineStatus,
@@ -19,6 +29,7 @@ import { Input } from "@/components/ui/input";
 
 export default function ProfileDashboard() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const offline = useOfflineStatus();
   const { formatMoney } = usePreferences();
   const { data: session, isPending: isSessionLoading } = useAppSession();
@@ -37,7 +48,7 @@ export default function ProfileDashboard() {
   if (isSessionLoading || balance.isPending) return <AppLoading compact />;
   if (!session) return null;
   const user = session.user;
-  const canWrite = offline.online && !offline.pending;
+  const canWrite = !offline.syncEnabled || (offline.online && !offline.pending);
   const formattedBalance = formatMoney(balance.data?.data.balance ?? 0);
   return (
     <div className="mx-auto max-w-4xl space-y-5 pb-24">
@@ -65,12 +76,29 @@ export default function ProfileDashboard() {
             {user.name}
           </h2>
           <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Mail className="size-3.5 shrink-0" />
+            {session.localOnly ? (
+              <Smartphone className="size-3.5 shrink-0" />
+            ) : (
+              <Mail className="size-3.5 shrink-0" />
+            )}
             <span className="truncate" title={user.email}>
-              {user.email}
+              {session.localOnly ? "No account needed" : user.email}
             </span>
           </p>
         </div>
+        {session.localOnly && (
+          <Button
+            variant="outline"
+            className="ml-auto h-11 rounded-xl"
+            onClick={async () => {
+              await sessionManager.expire(null);
+              router.replace("/auth/signin");
+            }}
+          >
+            <LogIn className="size-4" />
+            Sign in
+          </Button>
+        )}
       </section>
       <section
         aria-label="Account balance"

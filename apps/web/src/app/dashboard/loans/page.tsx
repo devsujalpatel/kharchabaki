@@ -9,7 +9,9 @@ import {
   ChevronDown,
   HandCoins,
   Loader2,
+  Pencil,
   Plus,
+  Trash2,
   WifiOff,
 } from "lucide-react";
 import { useOfflineStatus } from "@/components/providers/session-provider";
@@ -21,12 +23,16 @@ import { Input } from "@/components/ui/input";
 import {
   createGivenLoan,
   createTakenLoan,
+  deleteGivenLoan,
+  deleteTakenLoan,
   getGivenLoans,
   getTakenLoans,
   recordGivenLoanPayment,
   recordTakenLoanPayment,
   type GivenLoan,
   type TakenLoan,
+  updateGivenLoan,
+  updateTakenLoan,
 } from "@/server/loan";
 
 type LoanKind = "taken" | "given";
@@ -38,6 +44,20 @@ export default function LoansPage() {
   const { formatMoney } = usePreferences();
   const [kind, setKind] = useState<LoanKind>("taken");
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<{ kind: LoanKind; loan: Loan } | null>(null);
+  const [removing, setRemoving] = useState<{ kind: LoanKind; loan: Loan } | null>(null);
+  const deletion = useMutation({
+    mutationFn: ({ kind, loan }: { kind: LoanKind; loan: Loan }) =>
+      kind === "taken" ? deleteTakenLoan(loan.id) : deleteGivenLoan(loan.id),
+    onSuccess: async () => {
+      setRemoving(null);
+      await Promise.all(
+        ["loans", "balance", "dashboard-summary"].map((key) =>
+          queryClient.invalidateQueries({ queryKey: [key] }),
+        ),
+      );
+    },
+  });
   const taken = useQuery({
     queryKey: ["loans", "taken"],
     queryFn: getTakenLoans,
@@ -48,7 +68,7 @@ export default function LoansPage() {
   });
   const query = kind === "taken" ? taken : given;
   const loans: Loan[] = query.data?.data ?? [];
-  const canWrite = offline.online && !offline.pending;
+  const canWrite = !offline.syncEnabled || (offline.online && !offline.pending);
   const refresh = () => {
     for (const key of ["loans", "balance", "dashboard-summary"])
       void queryClient.invalidateQueries({ queryKey: [key] });
@@ -195,6 +215,13 @@ export default function LoansPage() {
                   kind={kind}
                   loan={loan}
                   onRefresh={refresh}
+                  canWrite={canWrite}
+                  onEdit={() => setEditing({ kind, loan })}
+                  onDelete={() => {
+                    deletion.reset();
+                    setRemoving({ kind, loan });
+                  }}
+                  deleting={deletion.isPending}
                 />
               ))}
             </div>
@@ -208,42 +235,97 @@ export default function LoansPage() {
           onRefresh={refresh}
         />
       )}
+      {editing && (
+        <LoanComposer
+          key={`${editing.kind}-${editing.loan.id}`}
+          kind={editing.kind}
+          loan={editing.loan}
+          onClose={() => setEditing(null)}
+          onRefresh={refresh}
+        />
+      )}
+      {removing && (
+        <FormDialog
+          title="Delete loan?"
+          icon={Trash2}
+          onClose={() => setRemoving(null)}
+          busy={deletion.isPending}
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This removes the loan and its payment history, and reverses its balance effects.
+            </p>
+            {deletion.error && (
+              <p role="alert" className="text-sm text-destructive">
+                {deletion.error.message}
+              </p>
+            )}
+            <Button
+              variant="destructive"
+              className="h-12 w-full rounded-xl"
+              disabled={deletion.isPending}
+              onClick={() => deletion.mutate(removing)}
+            >
+              {deletion.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              Delete loan
+            </Button>
+          </div>
+        </FormDialog>
+      )}
     </div>
   );
 }
 
 function LoanComposer({
   kind,
+  loan,
   onClose,
   onRefresh,
 }: {
   kind: LoanKind;
+  loan?: Loan;
   onClose: () => void;
   onRefresh: () => void;
 }) {
   const offline = useOfflineStatus();
   const [form, setForm] = useState({
-    amount: "",
-    person: "",
-    dueDate: "",
-    interest: "0.00",
+    amount: loan?.amount ?? "",
+    person: loan ? ("borrowedFrom" in loan ? loan.borrowedFrom : loan.borrowerName) : "",
+    dueDate: loan?.dueDate.slice(0, 10) ?? "",
+    interest: loan?.interest ?? "0.00",
   });
   const [validation, setValidation] = useState("");
   const mutation = useMutation<Loan>({
     mutationFn: () =>
       kind === "taken"
-        ? createTakenLoan({
-            amount: form.amount,
-            borrowedFrom: form.person.trim(),
-            dueDate: form.dueDate,
-            interest: form.interest,
-          }).then((response) => response.data)
-        : createGivenLoan({
-            amount: form.amount,
-            borrowerName: form.person.trim(),
-            dueDate: form.dueDate,
-            interest: form.interest,
-          }).then((response) => response.data),
+        ? (loan
+            ? updateTakenLoan(loan.id, {
+                amount: form.amount,
+                borrowedFrom: form.person.trim(),
+                dueDate: form.dueDate,
+                interest: form.interest,
+              })
+            : createTakenLoan({
+                amount: form.amount,
+                borrowedFrom: form.person.trim(),
+                dueDate: form.dueDate,
+                interest: form.interest,
+              })
+          ).then((response) => response.data)
+        : (loan
+            ? updateGivenLoan(loan.id, {
+                amount: form.amount,
+                borrowerName: form.person.trim(),
+                dueDate: form.dueDate,
+                interest: form.interest,
+              })
+            : createGivenLoan({
+                amount: form.amount,
+                borrowerName: form.person.trim(),
+                dueDate: form.dueDate,
+                interest: form.interest,
+              })
+          ).then((response) => response.data),
     onSuccess: () => {
       onRefresh();
       onClose();
@@ -251,7 +333,7 @@ function LoanComposer({
   });
   return (
     <FormDialog
-      title={kind === "taken" ? "Borrowed loan" : "Lent loan"}
+      title={loan ? "Edit loan" : kind === "taken" ? "Borrowed loan" : "Lent loan"}
       icon={kind === "taken" ? ArrowDownLeft : ArrowUpRight}
       onClose={onClose}
       busy={mutation.isPending}
@@ -336,7 +418,7 @@ function LoanComposer({
             {validation || mutation.error?.message}
           </p>
         )}
-        {(!offline.online || offline.pending > 0) && (
+        {offline.syncEnabled && (!offline.online || offline.pending > 0) && (
           <p className="text-xs text-muted-foreground">
             Connect and finish syncing to save.
           </p>
@@ -344,7 +426,8 @@ function LoanComposer({
         <Button
           type="submit"
           disabled={
-            !offline.online || offline.pending > 0 || mutation.isPending
+            (offline.syncEnabled && (!offline.online || offline.pending > 0)) ||
+            mutation.isPending
           }
           className="h-12 w-full rounded-xl font-semibold"
         >
@@ -353,7 +436,7 @@ function LoanComposer({
           ) : (
             <Check className="size-4" />
           )}
-          Save loan
+          {loan ? "Save changes" : "Save loan"}
         </Button>
       </form>
     </FormDialog>
@@ -364,10 +447,18 @@ function LoanRow({
   kind,
   loan,
   onRefresh,
+  canWrite,
+  onEdit,
+  onDelete,
+  deleting,
 }: {
   kind: LoanKind;
   loan: Loan;
   onRefresh: () => void;
+  canWrite: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  deleting: boolean;
 }) {
   const offline = useOfflineStatus();
   const { formatMoney } = usePreferences();
@@ -440,7 +531,9 @@ function LoanRow({
             aria-label={`Record ${kind === "taken" ? "repayment to" : "payment from"} ${person}`}
             title="Record payment"
             aria-haspopup="dialog"
-            disabled={!offline.online || offline.pending > 0}
+            disabled={
+              offline.syncEnabled && (!offline.online || offline.pending > 0)
+            }
             onClick={() => setPaying(true)}
           >
             <HandCoins className="size-5" />
@@ -459,6 +552,28 @@ function LoanRow({
           className="h-full rounded-full bg-primary"
           style={{ width: `${progress}%` }}
         />
+      </div>
+      <div className="mt-2 flex justify-end gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9 rounded-lg text-muted-foreground"
+          disabled={!canWrite || deleting}
+          onClick={onEdit}
+        >
+          <Pencil className="size-3.5" />
+          Edit
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9 rounded-lg text-muted-foreground hover:text-destructive"
+          disabled={!canWrite || deleting}
+          onClick={onDelete}
+        >
+          <Trash2 className="size-3.5" />
+          Delete
+        </Button>
       </div>
       <details className="group mt-3">
         <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-muted-foreground">
@@ -591,7 +706,8 @@ function PaymentComposer({
         <Button
           type="submit"
           disabled={
-            !offline.online || offline.pending > 0 || mutation.isPending
+            (offline.syncEnabled && (!offline.online || offline.pending > 0)) ||
+            mutation.isPending
           }
           className="h-12 w-full rounded-xl"
         >

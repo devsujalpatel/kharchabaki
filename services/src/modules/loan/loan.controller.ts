@@ -5,13 +5,19 @@ import {
   createGivenLoanPayment,
   createTakenLoan,
   createTakenLoanPayment,
+  deleteGivenLoan,
+  deleteTakenLoan,
   getGivenLoans,
   getTakenLoans,
+  updateGivenLoan,
+  updateTakenLoan,
 } from './loan.service.js';
 import {
   createGivenLoanSchema,
   createLoanPaymentSchema,
   createTakenLoanSchema,
+  updateGivenLoanSchema,
+  updateTakenLoanSchema,
   uuidParamSchema,
 } from './loan.schema.js';
 import { ApiResponse } from '../../types/common.types.js';
@@ -68,6 +74,60 @@ export const getGivenLoansController = async (
     message: 'Given loans fetched successfully',
     data: loans,
   } satisfies ApiResponse<typeof loans>);
+};
+
+export const updateTakenLoanController = async (
+  request: Request,
+  response: Response,
+) => {
+  const { id } = uuidParamSchema.parse(request.params);
+  const data = updateTakenLoanSchema.parse(request.body);
+  const loan = await updateTakenLoan(request.auth!.id, id, data);
+  response.status(200).json({
+    success: true,
+    message: 'Taken loan updated successfully',
+    data: loan,
+  } satisfies ApiResponse<typeof loan>);
+};
+
+export const updateGivenLoanController = async (
+  request: Request,
+  response: Response,
+) => {
+  const { id } = uuidParamSchema.parse(request.params);
+  const data = updateGivenLoanSchema.parse(request.body);
+  const loan = await updateGivenLoan(request.auth!.id, id, data);
+  response.status(200).json({
+    success: true,
+    message: 'Given loan updated successfully',
+    data: loan,
+  } satisfies ApiResponse<typeof loan>);
+};
+
+export const deleteTakenLoanController = async (
+  request: Request,
+  response: Response,
+) => {
+  const { id } = uuidParamSchema.parse(request.params);
+  const loan = await deleteTakenLoan(request.auth!.id, id);
+  response.status(200).json({
+    success: true,
+    message: 'Taken loan deleted successfully',
+    data: loan,
+  } satisfies ApiResponse<typeof loan>);
+};
+
+export const deleteGivenLoanController = async (
+  request: Request,
+  response: Response,
+) => {
+  const { id } = uuidParamSchema.parse(request.params);
+  const loan = await deleteGivenLoan(request.auth!.id, id);
+  response.status(200).json({
+    success: true,
+    message: 'Given loan deleted successfully',
+    data: loan,
+  } satisfies ApiResponse<typeof loan>);
 };
 
 export const createTakenLoanPaymentController = async (

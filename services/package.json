@@ -11,8 +11,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "typecheck": "tsc --noEmit",
-    "test": "tsc && node --experimental-test-module-mocks --test --test-isolation=none tests/*.test.mjs",
-    "test:offline": "node --import ./node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/offline.test.ts"
+    "test": "tsc && node --experimental-test-module-mocks --test tests/*.test.mjs",
+    "test:offline": "node --import ./node_modules/tsx/dist/loader.mjs --test --test-isolation=none tests/*.test.ts"
   },
   "keywords": [],
   "author": "Sujal Patel",

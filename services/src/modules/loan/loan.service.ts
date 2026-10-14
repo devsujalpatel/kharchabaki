@@ -29,6 +29,12 @@ type CreatePaymentInput = {
   paidAt?: Date;
 };
 
+type TakenLoanInput = CreateTakenLoanInput;
+type GivenLoanInput = CreateGivenLoanInput;
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+const toPaise = (amount: string | number) => Math.round(Number(amount) * 100);
+
 const totalWithInterest = (amount: string, interest: string) => {
   const principalInPaise = Math.round(Number(amount) * 100);
   const interestInBasisPoints = Math.round(Number(interest) * 100);
@@ -66,6 +72,7 @@ export const createTakenLoan = async (
   const totalAmount = totalWithInterest(data.amount, data.interest);
 
   return db.transaction(async (tx) => {
+    await lockOwner(tx, userId);
     const [loan] = await tx
       .insert(takenLoan)
       .values({
@@ -98,6 +105,7 @@ export const createGivenLoan = async (
   const totalAmount = totalWithInterest(data.amount, data.interest);
 
   return db.transaction(async (tx) => {
+    await lockOwner(tx, userId);
     await ensureSufficientBalance(tx, userId, data.amount);
 
     const [loan] = await tx
@@ -125,6 +133,174 @@ export const createGivenLoan = async (
   });
 };
 
+const lockOwner = async (tx: Transaction, userId: string) => {
+  const [owner] = await tx
+    .select({ balance: user.balance })
+    .from(user)
+    .where(eq(user.id, userId))
+    .for('update');
+
+  if (!owner) throw new ApiError(404, 'User not found');
+  return owner;
+};
+
+const statusFor = (paidAmount: string, totalAmount: string, dueDate: Date) =>
+  toPaise(paidAmount) >= toPaise(totalAmount)
+    ? 'paid'
+    : dueDate.getTime() < Date.now()
+      ? 'overdue'
+      : 'active';
+
+export const updateTakenLoan = async (
+  userId: string,
+  loanId: string,
+  data: TakenLoanInput,
+) =>
+  db.transaction(async (tx) => {
+    const owner = await lockOwner(tx, userId);
+    const [previous] = await tx
+      .select()
+      .from(takenLoan)
+      .where(and(eq(takenLoan.id, loanId), eq(takenLoan.userId, userId)))
+      .for('update');
+    if (!previous) throw new ApiError(404, 'Taken loan not found');
+
+    const amount = Number(data.amount).toFixed(2);
+    const interest = Number(data.interest).toFixed(2);
+    const totalAmount = totalWithInterest(amount, interest);
+    if (toPaise(totalAmount) < toPaise(previous.paidAmount))
+      throw new ApiError(
+        400,
+        'Total amount cannot be less than payments already recorded',
+      );
+
+    const balance =
+      toPaise(owner.balance) + toPaise(amount) - toPaise(previous.amount);
+    if (balance < 0) throw new ApiError(400, 'Insufficient balance');
+    const [updated] = await tx
+      .update(takenLoan)
+      .set({
+        amount,
+        borrowedFrom: data.borrowedFrom,
+        dueDate: data.dueDate,
+        interest,
+        totalAmount,
+        status: statusFor(previous.paidAmount, totalAmount, data.dueDate),
+      })
+      .where(and(eq(takenLoan.id, loanId), eq(takenLoan.userId, userId)))
+      .returning();
+    await tx
+      .update(user)
+      .set({ balance: (balance / 100).toFixed(2) })
+      .where(eq(user.id, userId));
+    return updated;
+  });
+
+export const updateGivenLoan = async (
+  userId: string,
+  loanId: string,
+  data: GivenLoanInput,
+) =>
+  db.transaction(async (tx) => {
+    const owner = await lockOwner(tx, userId);
+    const [previous] = await tx
+      .select()
+      .from(givenLoan)
+      .where(and(eq(givenLoan.id, loanId), eq(givenLoan.userId, userId)))
+      .for('update');
+    if (!previous) throw new ApiError(404, 'Given loan not found');
+
+    const amount = Number(data.amount).toFixed(2);
+    const interest = Number(data.interest).toFixed(2);
+    const totalAmount = totalWithInterest(amount, interest);
+    if (toPaise(totalAmount) < toPaise(previous.paidAmount))
+      throw new ApiError(
+        400,
+        'Total amount cannot be less than payments already recorded',
+      );
+
+    const balance =
+      toPaise(owner.balance) + toPaise(previous.amount) - toPaise(amount);
+    if (balance < 0) throw new ApiError(400, 'Insufficient balance');
+    const [updated] = await tx
+      .update(givenLoan)
+      .set({
+        amount,
+        borrowerName: data.borrowerName,
+        dueDate: data.dueDate,
+        interest,
+        totalAmount,
+        status: statusFor(previous.paidAmount, totalAmount, data.dueDate),
+      })
+      .where(and(eq(givenLoan.id, loanId), eq(givenLoan.userId, userId)))
+      .returning();
+    await tx
+      .update(user)
+      .set({ balance: (balance / 100).toFixed(2) })
+      .where(eq(user.id, userId));
+    return updated;
+  });
+
+export const deleteTakenLoan = async (userId: string, loanId: string) =>
+  db.transaction(async (tx) => {
+    const owner = await lockOwner(tx, userId);
+    const [loan] = await tx
+      .select()
+      .from(takenLoan)
+      .where(and(eq(takenLoan.id, loanId), eq(takenLoan.userId, userId)))
+      .for('update');
+    if (!loan) throw new ApiError(404, 'Taken loan not found');
+    const [payments] = await tx
+      .select({ total: sql<string>`coalesce(sum(${loanPayment.amount}), 0)` })
+      .from(loanPayment)
+      .where(eq(loanPayment.loanId, loanId));
+    const balance =
+      toPaise(owner.balance) -
+      toPaise(loan.amount) +
+      toPaise(payments?.total ?? 0);
+    if (balance < 0)
+      throw new ApiError(400, 'Insufficient balance to reverse this loan');
+    await tx
+      .update(user)
+      .set({ balance: (balance / 100).toFixed(2) })
+      .where(eq(user.id, userId));
+    await tx
+      .delete(takenLoan)
+      .where(and(eq(takenLoan.id, loanId), eq(takenLoan.userId, userId)));
+    return { id: loanId };
+  });
+
+export const deleteGivenLoan = async (userId: string, loanId: string) =>
+  db.transaction(async (tx) => {
+    const owner = await lockOwner(tx, userId);
+    const [loan] = await tx
+      .select()
+      .from(givenLoan)
+      .where(and(eq(givenLoan.id, loanId), eq(givenLoan.userId, userId)))
+      .for('update');
+    if (!loan) throw new ApiError(404, 'Given loan not found');
+    const [payments] = await tx
+      .select({
+        total: sql<string>`coalesce(sum(${givenLoanPayment.amount}), 0)`,
+      })
+      .from(givenLoanPayment)
+      .where(eq(givenLoanPayment.loanId, loanId));
+    const balance =
+      toPaise(owner.balance) +
+      toPaise(loan.amount) -
+      toPaise(payments?.total ?? 0);
+    if (balance < 0)
+      throw new ApiError(400, 'Insufficient balance to reverse this loan');
+    await tx
+      .update(user)
+      .set({ balance: (balance / 100).toFixed(2) })
+      .where(eq(user.id, userId));
+    await tx
+      .delete(givenLoan)
+      .where(and(eq(givenLoan.id, loanId), eq(givenLoan.userId, userId)));
+    return { id: loanId };
+  });
+
 export const getTakenLoans = async (userId: string) =>
   db.query.takenLoan.findMany({
     where: eq(takenLoan.userId, userId),
@@ -145,6 +321,7 @@ export const createTakenLoanPayment = async (
   data: CreatePaymentInput,
 ) =>
   db.transaction(async (tx) => {
+    await lockOwner(tx, userId);
     const [loan] = await tx
       .select()
       .from(takenLoan)
@@ -162,8 +339,11 @@ export const createTakenLoanPayment = async (
 
     await ensureSufficientBalance(tx, userId, data.amount);
 
-    const paidAmount = (Number(loan.paidAmount) + Number(data.amount)).toFixed(2);
-    const status = Number(paidAmount) >= Number(loan.totalAmount) ? 'paid' : 'active';
+    const paidAmount = (Number(loan.paidAmount) + Number(data.amount)).toFixed(
+      2,
+    );
+    const status =
+      Number(paidAmount) >= Number(loan.totalAmount) ? 'paid' : 'active';
 
     const [payment] = await tx
       .insert(loanPayment)
@@ -189,6 +369,7 @@ export const createGivenLoanPayment = async (
   data: CreatePaymentInput,
 ) =>
   db.transaction(async (tx) => {
+    await lockOwner(tx, userId);
     const [loan] = await tx
       .select()
       .from(givenLoan)
@@ -204,8 +385,11 @@ export const createGivenLoanPayment = async (
       throw new ApiError(400, 'Payment exceeds the outstanding amount');
     }
 
-    const paidAmount = (Number(loan.paidAmount) + Number(data.amount)).toFixed(2);
-    const status = Number(paidAmount) >= Number(loan.totalAmount) ? 'paid' : 'active';
+    const paidAmount = (Number(loan.paidAmount) + Number(data.amount)).toFixed(
+      2,
+    );
+    const status =
+      Number(paidAmount) >= Number(loan.totalAmount) ? 'paid' : 'active';
 
     const [payment] = await tx
       .insert(givenLoanPayment)
