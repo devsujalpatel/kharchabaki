@@ -6,7 +6,22 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-val apiBaseUrl = providers.gradleProperty("API_BASE_URL").orElse("http://10.0.2.2:4000").get().trimEnd('/')
+// Read only the public API origin from the app's .env; Gradle and shell overrides take precedence.
+val dotEnvApiUrl = providers.fileContents(rootProject.layout.projectDirectory.file(".env")).asText
+    .map { content ->
+        content.lineSequence()
+            .map { it.trim().removePrefix("\uFEFF").removePrefix("export ").trim() }
+            .lastOrNull { '=' in it && it.substringBefore('=').trim() == "API_BASE_URL" }
+            ?.substringAfter('=')?.substringBefore(" #")?.trim()
+            ?.removeSurrounding("\"")?.removeSurrounding("'")
+            .orEmpty()
+    }
+    .filter { it.isNotEmpty() }
+val apiBaseUrl = providers.gradleProperty("API_BASE_URL")
+    .orElse(providers.environmentVariable("API_BASE_URL"))
+    .orElse(dotEnvApiUrl)
+    .orElse("http://10.0.2.2:4000")
+    .get().trim().trimEnd('/')
 require(apiBaseUrl.startsWith("https://") || apiBaseUrl.startsWith("http://")) {
     "API_BASE_URL must be an absolute HTTP(S) origin, without /api/v1."
 }

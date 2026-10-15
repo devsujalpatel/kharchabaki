@@ -26,7 +26,9 @@ The default development origin is `http://10.0.2.2:4000`, which reaches the host
 ./gradlew :app:assembleDebug -PAPI_BASE_URL=https://your-api.example.com
 ```
 
-You can also set `API_BASE_URL=https://your-api.example.com` in an untracked local Gradle properties file. Use HTTPS on a physical device and in production. HTTP is limited to emulator/loopback development addresses and permitted only by the debug manifest; release builds reject cleartext traffic.
+You can also copy `.env.example` to `.env` in this directory and set `API_BASE_URL=https://your-api.example.com`. The build reads the URL in this order: Gradle property (`-PAPI_BASE_URL` or `gradle.properties`), shell environment, `.env`, then the emulator default. `.env` accepts a literal URL with optional single/double quotes and is ignored by Git. Rebuild the APK after changing the URL; the installed app does not read `.env` at runtime. Use HTTPS on a physical device and in production. HTTP is limited to emulator/loopback development addresses and permitted only by the debug manifest; release builds reject cleartext traffic.
+
+The native Android HTTP client does not need a browser CORS allowlist entry. Keep the backend's existing browser origins and its separate Better Auth `kharchabaki://` trusted origin; the backend already has the latter configured.
 
 Google sign-in uses the backend's existing Better Auth Expo browser bridge, including `expo-origin`, its authorization proxy, and the `kharchabaki://kotlin-auth` callback. The existing `kharchabaki://` trusted origin supports it. Configure the backend's Google provider and redirect URL as for the current mobile app. The callback requires a matching one-use nonce and expires after ten minutes. Email/password sign-in is also available for existing accounts enabled on the backend.
 

@@ -2,7 +2,7 @@
 
 Kharchabaki is a personal finance app for keeping everyday money matters in one place: income, expenses, balances, and money lent or borrowed.
 
-The repository contains an Express API, a Next.js web app, and an Expo mobile app.
+The repository contains an Express API, a Next.js web app, an Expo mobile app, and a native Kotlin Android app.
 
 ## Project structure
 
@@ -10,9 +10,12 @@ The repository contains an Express API, a Next.js web app, and an Expo mobile ap
 kharchabaki/
 ├── apps/
 │   ├── kharchabaki-native/ # Expo mobile app
+│   ├── kharchabaki-kotlin/ # Kotlin + Jetpack Compose Android app
 │   └── web/                # Next.js web app
 └── services/         # Express API
 ```
+
+The Kotlin Android rewrite builds independently and installs alongside the Expo app. See [its README](apps/kharchabaki-kotlin/README.md) for setup, API configuration, data transfer, and release performance validation.
 
 ## API quick start
 
