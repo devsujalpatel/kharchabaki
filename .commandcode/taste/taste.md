@@ -2,3 +2,4 @@
 - Prefers a concise home screen with compact, non-duplicated month navigation; put detailed charts and expense/income breakdowns in a dedicated analytics view rather than on Home. Confidence: 0.95
 - Prefers messaging actions to open the device’s default messaging app with a generic message prefilled, leaving review and sending under the user’s control rather than sending automatically. Confidence: 0.9
 - Values clear, user-friendly loan interfaces. Confidence: 0.8
+- Prefers mobile apps to feel responsive and native to their platform, avoiding sluggish or laggy interactions. Confidence: 0.8

@@ -30,6 +30,7 @@ sealed interface AppAction {
     data class SaveLoan(val loan: Loan) : AppAction
     data class DeleteLoan(val id: String) : AppAction
     data class RecordPayment(val id: String, val amountCents: Long) : AppAction
+    data class MessageLoan(val phoneNumber: String) : AppAction
     data class SavePreferences(val preferences: Preferences) : AppAction
     data class SetOpeningBalance(val cents: Long) : AppAction
 }

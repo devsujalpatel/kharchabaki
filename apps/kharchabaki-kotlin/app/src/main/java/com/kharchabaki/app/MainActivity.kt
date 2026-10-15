@@ -1,6 +1,7 @@
 package com.kharchabaki.app
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.kharchabaki.app.ui.KharchabakiApp
 import com.kharchabaki.app.ui.ToolsScreen
+import com.kharchabaki.app.ui.loanMessageBody
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -50,6 +52,12 @@ class MainActivity : ComponentActivity() {
                     try {
                         when (event) {
                             is UiEvent.OpenBrowser -> startActivity(Intent(Intent.ACTION_VIEW, event.url.toUri()).addCategory(Intent.CATEGORY_BROWSABLE))
+                            is UiEvent.ComposeMessage -> {
+                                val uri = Uri.fromParts("smsto", event.phoneNumber, null)
+                                val intent = Intent(Intent.ACTION_SENDTO, uri)
+                                    .putExtra("sms_body", loanMessageBody)
+                                startActivity(intent)
+                            }
                             is UiEvent.Export -> if (event.json) exportJson.launch("kharchabaki-${LocalDate.now()}.json") else exportCsv.launch("kharchabaki-${LocalDate.now()}.csv")
                             is UiEvent.Import -> if (event.json) importJson.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) else importCsv.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel", "application/octet-stream"))
                         }

@@ -27,7 +27,20 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 private val chartColors = listOf(Color(0xFF34C98B), Color(0xFFEF767A), Color(0xFF5D9BF8), Color(0xFFF5B94C), Color(0xFFAA8CF8), Color(0xFF47CDE1), Color(0xFFF18ABC), Color(0xFFACCD57))
-private data class CashBar(val label: String, val income: Long, val expense: Long)
+internal data class CashBar(val label: String, val income: Long, val expense: Long)
+
+internal fun monthlyCashBars(transactions: List<com.kharchabaki.app.data.FinanceTransaction>, month: YearMonth): List<CashBar> {
+    val months = (5 downTo 0).map { month.minusMonths(it.toLong()) }
+    val totals = months.associate { it.toString() to longArrayOf(0L, 0L) }
+    transactions.forEach { transaction ->
+        val total = totals[transaction.occurredAt.take(7)] ?: return@forEach
+        total[if (transaction.type == "income") 0 else 1] += transaction.amountCents
+    }
+    return months.map { target ->
+        val total = totals.getValue(target.toString())
+        CashBar(target.format(DateTimeFormatter.ofPattern("MMM")), total[0], total[1])
+    }
+}
 
 @Composable
 fun AnalyticsScreen(state: AppUiState) {
@@ -39,11 +52,8 @@ fun AnalyticsScreen(state: AppUiState) {
     val expenses = remember(transactions) { transactions.filter { it.type == "expense" }.groupBy { it.category }.map { it.key to it.value.sumOf { t -> t.amountCents } }.sortedByDescending { it.second } }
     val incomes = remember(transactions) { transactions.filter { it.type == "income" }.groupBy { it.category }.map { it.key to it.value.sumOf { t -> t.amountCents } }.sortedByDescending { it.second } }
     val bars = remember(state.finance.transactions, monthString, monthly) {
-        if (monthly) (5 downTo 0).map { offset ->
-            val target = month.minusMonths(offset.toLong())
-            val entries = state.finance.transactions.filter { it.occurredAt.startsWith(target.toString()) }
-            CashBar(target.format(DateTimeFormatter.ofPattern("MMM")), entries.filter { it.type == "income" }.sumOf { it.amountCents }, entries.filter { it.type == "expense" }.sumOf { it.amountCents })
-        } else {
+        if (monthly) monthlyCashBars(state.finance.transactions, month)
+        else {
             val byDay = transactions.groupBy { dateOnly(it.occurredAt).dayOfMonth }
             (1..month.lengthOfMonth()).map { day ->
                 val entries = byDay[day].orEmpty()

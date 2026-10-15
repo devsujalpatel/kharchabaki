@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 sealed interface UiEvent {
     data class OpenBrowser(val url: String) : UiEvent
+    data class ComposeMessage(val phoneNumber: String) : UiEvent
     data class Export(val json: Boolean) : UiEvent
     data class Import(val json: Boolean) : UiEvent
 }
@@ -117,6 +118,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     } else repository.recordLoanPayment(action.id, action.amountCents)
                     saved("Payment recorded")
                 }
+                is AppAction.MessageLoan -> eventChannel.send(UiEvent.ComposeMessage(action.phoneNumber))
                 is AppAction.SetOpeningBalance -> {
                     ensureWorkspace(token)
                     if (repository.state.value.premium) cloud.mutate("/balance", body = buildJsonObject { putMoney("amount", action.cents) }, expectedWorkspaceToken = token)
@@ -182,7 +184,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun onResume() {
         if (!cloud.state.value.starting) viewModelScope.launch(Dispatchers.IO) {
             try {
-                cloud.refresh()
+                cloud.refreshIfStale()
                 val finance = repository.state.value
                 if (finance.ready && !finance.premium) repository.withWorkspace(finance.workspaceToken) { repository.runRecurring() }
             }

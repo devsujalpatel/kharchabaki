@@ -22,6 +22,9 @@ import java.time.format.DateTimeFormatter
 
 private fun loanBalanceEffect(loan: Loan): Long = (loan.amountCents - loan.paidCents) * if (loan.kind == "taken") 1 else -1
 
+internal const val loanMessageBody = "Hi, this is a reminder about the amount we discussed. Please let me know when you can repay it."
+internal fun canMessageLoan(loan: Loan): Boolean = loan.kind == "given" && loan.phoneNumber.isNotBlank()
+
 @Composable
 fun LoansScreen(state: AppUiState, onAction: (AppAction) -> Unit) {
     var kind by rememberSaveable { mutableStateOf("taken") }
@@ -54,7 +57,7 @@ fun LoansScreen(state: AppUiState, onAction: (AppAction) -> Unit) {
         }
         if (loans.isEmpty()) item { EmptyState(if (kind == "taken") "No borrowed loans" else "No lent loans", "Add a loan to keep amounts, due dates, and repayments together.") }
         items(loans, key = { it.id }, contentType = { "loan" }) { loan ->
-            LoanCard(loan, money, onEdit = { draft = loan }, onDelete = { deleting = loan }, onRepay = { paying = loan })
+            LoanCard(loan, money, onEdit = { draft = loan }, onDelete = { deleting = loan }, onRepay = { paying = loan }, onMessage = { onAction(AppAction.MessageLoan(loan.phoneNumber)) })
         }
         item { Spacer(Modifier.height(12.dp)) }
     }
@@ -84,7 +87,7 @@ fun LoansScreen(state: AppUiState, onAction: (AppAction) -> Unit) {
 }
 
 @Composable
-private fun LoanCard(loan: Loan, money: (Long) -> String, onEdit: () -> Unit, onDelete: () -> Unit, onRepay: () -> Unit) {
+private fun LoanCard(loan: Loan, money: (Long) -> String, onEdit: () -> Unit, onDelete: () -> Unit, onRepay: () -> Unit, onMessage: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     var history by rememberSaveable(loan.id) { mutableStateOf(false) }
     FinanceCard(Modifier.fillMaxWidth()) {
@@ -112,6 +115,7 @@ private fun LoanCard(loan: Loan, money: (Long) -> String, onEdit: () -> Unit, on
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             if (loan.payments.isNotEmpty()) TextButton(onClick = { history = !history }) { Text(if (history) "Hide payments" else "${loan.payments.size} payments", style = MaterialTheme.typography.labelMedium) }
             Spacer(Modifier.weight(1f))
+            if (canMessageLoan(loan)) TextButton(onClick = onMessage, modifier = Modifier.heightIn(min = 48.dp)) { Text("Message") }
             if (loan.remainingCents > 0) FilledTonalButton(onClick = onRepay, shape = RoundedCornerShape(12.dp)) { Text(if (loan.kind == "taken") "Repay" else "Collect") }
         }
         if (history) loan.payments.sortedByDescending { it.paidAt }.forEach { payment ->

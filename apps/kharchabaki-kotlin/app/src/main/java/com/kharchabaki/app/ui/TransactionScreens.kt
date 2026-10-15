@@ -27,6 +27,9 @@ import java.time.format.DateTimeFormatter
 
 private data class MonthTotals(val balance: Long, val income: Long, val expense: Long)
 
+internal fun groupHistoryTransactions(transactions: List<FinanceTransaction>): List<Pair<String, List<FinanceTransaction>>> =
+    transactions.groupBy { it.occurredAt.take(10) }.toList()
+
 @Composable
 fun OverviewScreen(state: AppUiState, onAction: (AppAction) -> Unit, onHistory: () -> Unit) {
     var monthString by rememberSaveable { mutableStateOf(YearMonth.now(ZoneOffset.UTC).toString()) }
@@ -119,9 +122,9 @@ fun HistoryScreen(state: AppUiState, onAction: (AppAction) -> Unit) {
         state.finance.transactions.filter { t ->
             (allMonths || t.occurredAt.startsWith(monthString)) && (type == "all" || t.type == type) && (category == "all" || t.category == category) &&
                 (query.isBlank() || t.description.contains(query, true) || prettyLabel(t.category).contains(query, true) || Money.decimal(t.amountCents).contains(query))
-        }.sortedByDescending { it.occurredAt }
+        }
     }
-    val groups = remember(filtered) { filtered.groupBy { it.occurredAt.take(10) } }
+    val groups = remember(filtered) { groupHistoryTransactions(filtered) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

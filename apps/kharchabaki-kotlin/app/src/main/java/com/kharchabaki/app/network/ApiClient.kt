@@ -92,20 +92,15 @@ private class PersistentCookieJar(private val base: HttpUrl, private val store: 
 
     @Synchronized fun clear() { cookies = emptyList(); store.write("cookies", null) }
     @Synchronized fun oauthState(): String? = cookies.firstOrNull {
-        it.name.removePrefix("__Secure-") == "better-auth.oauth_state" && it.expiresAt > System.currentTimeMillis()
+        normalizedAuthCookieName(it.name) == "better-auth.oauth_state" && it.expiresAt > System.currentTimeMillis()
     }?.value
 
     @Synchronized fun importCallbackCookies(value: String) {
-        require(value.length <= 65536) { "Invalid authentication callback" }
-        // The Expo plugin joins Set-Cookie headers. Split only at a new cookie, preserving Expires commas.
-        val parsed = value.split(Regex(",(?=\\s*[^;,=\\s]+\\s*=)"))
-            .mapNotNull { Cookie.parse(base.resolve("/api/auth/get-session")!!, it.trim()) }.filter(::owned)
-        require(parsed.any { it.name.removePrefix("__Secure-") == "better-auth.session_token" }) {
-            "The sign-in callback did not contain a session. Try signing in again."
-        }
-        saveFromResponse(base, parsed)
+        // Validate before replacing an existing account's cookies.
+        val parsed = parseCallbackCookies(base, value)
+        store.write("cookies", authJson.encodeToString(parsed.map(Cookie::toString)))
+        cookies = parsed
     }
-    private fun owned(cookie: Cookie) = cookie.domain == base.host &&
-        cookie.name.removePrefix("__Secure-").startsWith("better-auth.")
+    private fun owned(cookie: Cookie) = isOwnedAuthCookie(base, cookie)
     private fun persist() = store.write("cookies", authJson.encodeToString(cookies.map(Cookie::toString)))
 }

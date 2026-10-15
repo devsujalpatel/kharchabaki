@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.os.SystemClock
 import com.kharchabaki.app.BuildConfig
 import com.kharchabaki.app.data.*
 import kotlinx.coroutines.*
@@ -36,6 +37,8 @@ class CloudCoordinator(context: Context, private val repository: FinanceReposito
     private val mutable = MutableStateFlow(CloudState(online = connected()))
     val state: StateFlow<CloudState> = mutable.asStateFlow()
     private var started = false
+    private var lastRefreshAt = 0L
+    private var lastRefreshSucceeded = false
     private var syncJob: Job? = null
     private var networkRegistered = false
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -74,7 +77,7 @@ class CloudCoordinator(context: Context, private val repository: FinanceReposito
             if (identity != null && validIdentity(identity) && identity.valid) activateLocked(identity)
             else if (identity != null) expireLocked()
             mutable.update { it.copy(starting = false) }
-            if (state.value.session?.localOnly == false && state.value.online) scope.launch { refresh() }
+            if (state.value.session?.localOnly == false && state.value.online) scope.launch { refreshIfStale() }
         } catch (error: Exception) { reportLocked(error) }
         finally { mutable.update { it.copy(starting = false, verifying = false, syncing = false) } }
     }
@@ -132,16 +135,16 @@ class CloudCoordinator(context: Context, private val repository: FinanceReposito
         if (uri.scheme != "kharchabaki" || uri.host != "kotlin-auth" || !uri.path.isNullOrEmpty()) return@serialized false
         val pending = store.read("oauth")?.let { runCatching { authJson.decodeFromString<PendingOAuth>(it) }.getOrNull() }
             ?: return@serialized false
-        val nonces = uri.getQueryParameters("nonce")
+        val parameters = decodeOAuthQuery(uri.encodedQuery)
+        val nonces = parameters["nonce"].orEmpty()
         if (nonces.size != 1 || System.currentTimeMillis() !in pending.createdAt..(pending.createdAt + 600_000) ||
             !MessageDigest.isEqual(nonces.single().toByteArray(), pending.nonce.toByteArray())) return@serialized false
         store.write("oauth", null) // Consume once, before processing any cookie material.
         try {
-            val errors = uri.getQueryParameters("error")
+            val errors = parameters["error"].orEmpty()
             require(errors.isEmpty()) { "Google sign-in was cancelled or denied. Please try again." }
-            val cookies = uri.getQueryParameters("cookie")
+            val cookies = parameters["cookie"].orEmpty()
             require(cookies.size == 1) { "Google sign-in did not return a session. Please try again." }
-            api.clearCookies()
             api.importCallbackCookies(cookies.single())
             repository.deactivate()
             store.write("identity", null)
@@ -160,12 +163,21 @@ class CloudCoordinator(context: Context, private val repository: FinanceReposito
         finally { expireLocked(null) }
     }
 
-    suspend fun refresh() = serialized {
+    suspend fun refresh() = serialized { refreshLocked() }
+
+    suspend fun refreshIfStale() = serialized {
+        if (!lastRefreshSucceeded || SystemClock.elapsedRealtime() - lastRefreshAt >= 60_000) refreshLocked()
+    }
+
+    private suspend fun refreshLocked() {
+        lastRefreshSucceeded = false
         try {
             if (state.value.session?.valid == false) expireLocked()
             else if (state.value.session?.localOnly == false) {
                 verifyLocked()
                 if (state.value.session?.isPremium == true) syncLocked()
+                lastRefreshAt = SystemClock.elapsedRealtime()
+                lastRefreshSucceeded = state.value.online
             }
         } catch (error: Exception) { reportLocked(error) }
     }
