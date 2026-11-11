@@ -1,5 +1,9 @@
 import {
   Apple,
+  Cigarette,
+  CupSoda,
+  Wine,
+  Tags,
   Award,
   Baby,
   BadgeDollarSign,
@@ -68,6 +72,12 @@ export const expenseCategories = [
   "childcare",
   "donations",
   "taxes",
+  "miscellaneous",
+  "cold-drinks",
+  "smoke",
+  "alcohol",
+  "personal-care",
+  "mutual-funds",
   "other",
 ] as const;
 export const incomeSources = [
@@ -85,11 +95,26 @@ export const incomeSources = [
   "refund",
   "pension",
   "sale",
+  "cashback",
+  "reimbursement",
+  "miscellaneous",
+  "investment-profit",
+  "investment-redemption",
   "other",
 ] as const;
 export type ExpenseCategory = (typeof expenseCategories)[number];
 export type IncomeSource = (typeof incomeSources)[number];
 const categoryIcons: Record<string, typeof Wallet> = {
+  "cold-drinks": CupSoda,
+  smoke: Cigarette,
+  alcohol: Wine,
+  miscellaneous: CircleEllipsis,
+  "personal-care": Sparkles,
+  "mutual-funds": TrendingUp,
+  "investment-profit": ChartNoAxesCombined,
+  "investment-redemption": RotateCcw,
+  cashback: BadgeDollarSign,
+  reimbursement: RotateCcw,
   food: Utensils,
   travel: Plane,
   shopping: ShoppingBag,
@@ -137,7 +162,7 @@ const categoryIcons: Record<string, typeof Wallet> = {
   bonues: Award,
 };
 export function categoryIcon(category?: string | null) {
-  return categoryIcons[category ?? "other"] ?? CircleEllipsis;
+  return categoryIcons[category ?? "other"] ?? Tags;
 }
 export const themes = [
   "light",

@@ -22,20 +22,29 @@ import { Textarea } from "@/components/ui/textarea";
 export function TransactionComposer({
   type,
   onClose,
+  initialCategory = "",
 }: {
   type: "income" | "expense";
   onClose: () => void;
+  initialCategory?: string;
 }) {
   const client = useQueryClient();
   const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(initialCategory);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [description, setDescription] = useState("");
   const [validation, setValidation] = useState("");
   const isIncome = type === "income";
   const labels = useQuery({ queryKey: ["finance-labels"], queryFn: getLabels });
-  const customOptions = (labels.data?.data ?? []).filter((item) => item.active && item.kind === type).map((item) => item.key);
-  const options = [...new Set([...(isIncome ? incomeSources : expenseCategories), ...customOptions])];
+  const customOptions = (labels.data?.data ?? [])
+    .filter((item) => item.active && item.kind === type)
+    .map((item) => item.key);
+  const options = [
+    ...new Set([
+      ...(isIncome ? incomeSources : expenseCategories),
+      ...customOptions,
+    ]),
+  ];
   const mutation = useMutation({
     mutationFn: () => {
       const data = {

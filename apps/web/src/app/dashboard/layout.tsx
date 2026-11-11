@@ -1,3 +1,4 @@
+import { RecurringProcessor } from "@/components/recurring-processor";
 import { DashboardGuard } from "@/components/dashboard-guard";
 import { PreferencesProvider } from "@/components/providers/preferences-provider";
 import { NavigationBreadcrumb } from "@/components/dahboard/breadcrumb";
@@ -10,6 +11,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <main className="mx-auto w-full max-w-6xl px-4 py-3 sm:px-6 sm:pt-20">
           <Navbar />
           <NavigationBreadcrumb />
+          <RecurringProcessor />
           <div className="mt-5">{children}</div>
         </main>
       </PreferencesProvider>

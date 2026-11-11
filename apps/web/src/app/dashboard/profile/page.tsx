@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { CalendarClock, HandCoins, Tags, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { sessionManager } from "@/lib/offline-client";
@@ -144,6 +146,27 @@ export default function ProfileDashboard() {
             Connect and finish syncing to change your opening balance.
           </p>
         )}
+      </section>
+      <section className="rounded-2xl border bg-card p-5">
+        <h2 className="mb-4 font-semibold">Finance tools</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {[
+            { label: "Investments", href: "investments", Icon: TrendingUp },
+            { label: "Loans", href: "loans", Icon: HandCoins },
+            { label: "Budgets", href: "budgets", Icon: Wallet },
+            { label: "Recurring", href: "recurring", Icon: CalendarClock },
+            { label: "Categories", href: "categories", Icon: Tags },
+          ].map(({ label, href, Icon }) => (
+            <Link
+              key={href}
+              href={`/dashboard/${href}`}
+              className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border bg-background p-3 text-sm transition hover:bg-muted"
+            >
+              <Icon className="size-5 text-primary" />
+              {label}
+            </Link>
+          ))}
+        </div>
       </section>
       <PreferencesSettings />
       {editing && (

@@ -144,3 +144,24 @@ Native startup restores device data before waiting for network verification. The
 The production web service worker caches visited app pages and assets, excluding API responses and session tokens. Run `pnpm build` followed by `pnpm start` in `apps/web` to test offline reopening. Native builds need AsyncStorage and Expo Crypto modules (`pnpm android` or `pnpm ios` in `apps/kharchabaki-native`).
 
 Run `pnpm test:offline` from `services/` for guest persistence, free/Premium isolation, local finance validation, queued sync, response loss, storage failures, concurrent tabs, revocation, and expiry. `pnpm test` covers finance APIs and Premium authorization, including blocked client entitlement changes.
+
+## Investment tracking and SIPs
+
+Web and React Native include **Investments**, available from the overview (and mobile Profile).
+Contributions use the `mutual-funds` expense category; received profits use the
+`investment-profit` income source, and returned principal uses `investment-redemption`.
+Record the fund name in the note. These entries participate in the existing cash ledger,
+transaction editing, backups, and Premium sync; totals are cash records, not portfolio market
+value, NAV, or unrealised returns. Existing generic `investment` income is left unchanged.
+
+Monthly SIPs are recurring expense rules with the `mutual-funds` category. They record app
+balance deductions, **not real bank debits**. Due rules run on dashboard entry/focus and every minute while the app is open. Missed dates catch up; monthly
+rules preserve their starting day and use the last day of shorter months. Insufficient funds
+pause the rule without deducting money; resume it from Recurring after adding funds. Pausing
+preserves the next due date, so resuming catches up missed entries. Real bank mandates and
+unattended server scheduling are separate future integrations.
+
+Additional built-ins include miscellaneous, cold drinks, smoke, alcohol, personal care,
+cashback, and reimbursement. Category pickers show icons above short labels, including a
+fallback icon for custom labels. Analytics includes line, pie/donut, bar, and spending radar
+views with textual totals.

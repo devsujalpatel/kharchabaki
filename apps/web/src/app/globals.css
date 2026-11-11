@@ -421,3 +421,38 @@ html.rose {
   --text-subtle: #93546f;
   --text-dim: #93546f;
 }
+
+/* Native controls must inherit the selected palette, including their popup options. */
+:root,
+.dark,
+.ocean,
+.forest,
+.sunset {
+  color-scheme: dark;
+}
+.light,
+.rose {
+  color-scheme: light;
+}
+select,
+option {
+  background-color: var(--card);
+  color: var(--foreground);
+}
+select {
+  border-color: var(--border);
+}
+input[type="date"] {
+  color: var(--foreground);
+}
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}

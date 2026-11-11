@@ -1,5 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { CashTrend } from "@/components/finance-charts";
+import { transactionsQuery } from "@/server/transactions";
+import { categoryIcon, formatLabel } from "@/lib/finance";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Plus, Wallet } from "lucide-react";
@@ -27,6 +31,11 @@ export default function Dashboard() {
     queryFn: () => dashboardSummaryQuery(month),
   });
 
+  const recent = useQuery({
+    queryKey: ["transactions", "home", month],
+    queryFn: () =>
+      transactionsQuery({ month, type: "all", category: "all", search: "" }),
+  });
   return (
     <div className="space-y-6 pb-24">
       <div>
@@ -98,6 +107,76 @@ export default function Dashboard() {
           </span>
           <span className="text-sm font-semibold">Add income</span>
         </Button>
+      </section>
+      <Link
+        href="/dashboard/investments"
+        className="flex items-center justify-between rounded-2xl border border-primary/20 bg-primary/5 p-5"
+      >
+        <div>
+          <p className="font-semibold">Invest in your future</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Mutual funds, earnings & monthly SIPs
+          </p>
+        </div>
+        <span aria-hidden="true">↗</span>
+      </Link>
+      {summary && <CashTrend points={summary.data.monthly} />}
+      <section className="overflow-hidden rounded-2xl border bg-card">
+        <div className="flex items-center justify-between p-5">
+          <h2 className="font-semibold">Recent payments</h2>
+          <Link href="/dashboard/transactions" className="text-sm text-primary">
+            View all →
+          </Link>
+        </div>
+        {recent.error && (
+          <p role="alert" className="p-5 text-sm text-destructive">
+            {recent.error.message}
+          </p>
+        )}
+        {recent.isPending ? (
+          <p className="p-5 text-sm text-muted-foreground">Loading activity…</p>
+        ) : !recent.data?.data.length ? (
+          <p className="p-5 text-sm text-muted-foreground">
+            No payments this month. Add an entry to get started.
+          </p>
+        ) : (
+          [...recent.data.data]
+            .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+            .slice(0, 5)
+            .map((row) => {
+              const Icon = categoryIcon(row.category ?? row.source);
+              return (
+                <Link
+                  href="/dashboard/transactions"
+                  key={row.id}
+                  className="flex items-center gap-3 border-t p-4 transition hover:bg-muted/50"
+                >
+                  <span className="rounded-xl bg-primary/10 p-3 text-primary">
+                    <Icon className="size-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                      {row.description ||
+                        formatLabel(row.category ?? row.source ?? "other")}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatLabel(row.category ?? row.source ?? "other")} ·{" "}
+                      {row.occurredAt.slice(0, 10)}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-sm font-semibold tabular-nums",
+                      row.type === "income" && "text-income",
+                    )}
+                  >
+                    {row.type === "income" ? "+" : "−"}
+                    {formatMoney(row.amount)}
+                  </span>
+                </Link>
+              );
+            })
+        )}
       </section>
       {entryType && (
         <TransactionComposer

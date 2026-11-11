@@ -39,7 +39,7 @@ const createId = (templateId: string, due: Date) => {
     .slice(0, 32);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${((parseInt(hex[16]!, 16) & 0x3) | 0x8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20)}`;
 };
-async function generateDue(userId: string) {
+export async function generateDue(userId: string) {
   const now = new Date();
   const templates = await db.select().from(recurringTransaction).where(and(
     eq(recurringTransaction.userId, userId),
@@ -49,10 +49,11 @@ async function generateDue(userId: string) {
   for (const template of templates) {
     let next = new Date(template.nextRunAt);
     const anchorDay = Number(template.dayOfMonth) || new Date(template.startAt).getUTCDate();
+    let funded = true;
     while (next <= now && (!template.endAt || next <= template.endAt)) {
       const scheduledFor = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth(), next.getUTCDate()));
       const transactionId = createId(template.id, scheduledFor);
-      await db.transaction(async (tx) => {
+      funded = await db.transaction(async (tx) => {
         const [owner] = await tx.select({ id: user.id }).from(user).where(eq(user.id, userId)).for('update');
         if (!owner) throw new ApiError(404, 'User not found');
         const [existingOccurrence] = await tx.select().from(recurringOccurrence).where(and(
@@ -63,8 +64,7 @@ async function generateDue(userId: string) {
           const [ownerBalance] = await tx.select({ balance: user.balance }).from(user).where(eq(user.id, userId)).for('update');
           if (!ownerBalance) throw new ApiError(404, 'User not found');
           const change = Number(template.amount).toFixed(2);
-          if (template.type === 'expense' && Number(ownerBalance.balance) < Number(change))
-            throw new ApiError(400, 'Insufficient balance for recurring expense');
+          if (template.type === 'expense' && Number(ownerBalance.balance) < Number(change)) return false;
           if (template.type === 'income') {
             await tx.insert(income).values({ id: transactionId, userId, amount: change, source: template.category!, description: template.description, receivedAt: scheduledFor });
             await tx.update(user).set({ balance: sql`${user.balance} + ${change}::numeric` }).where(eq(user.id, userId));
@@ -74,10 +74,12 @@ async function generateDue(userId: string) {
           }
           await tx.insert(recurringOccurrence).values({ userId, recurringTransactionId: template.id, scheduledFor, transactionId });
         }
+        return true;
       });
+      if (!funded) break;
       next = addInterval(next, template.schedule, Number(template.interval), anchorDay);
     }
-    const enabled = !template.endAt || next <= template.endAt;
+    const enabled = funded && (!template.endAt || next <= template.endAt);
     await db.update(recurringTransaction).set({ nextRunAt: next, enabled }).where(and(
       eq(recurringTransaction.id, template.id), eq(recurringTransaction.userId, userId),
     ));

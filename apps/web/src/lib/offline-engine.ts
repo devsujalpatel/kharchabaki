@@ -147,12 +147,12 @@ function seedLocalDocument(cloud: Document): Document {
   return local;
 }
 const sources = new Set(
-  "salary pocket-money gift investment bonus part-time freelance business rental interest dividends refund pension sale other invesment bonues".split(
+  "salary pocket-money gift investment bonus part-time freelance business rental interest dividends refund pension sale cashback reimbursement miscellaneous investment-profit investment-redemption other invesment bonues".split(
     " ",
   ),
 );
 const categories = new Set(
-  "food travel shopping bills rent phone beauty clothing fuel gifts electronics snacks drinks vegetables fruits repairs health education entertainment groceries transport insurance subscriptions fitness pets childcare donations taxes other".split(
+  "food travel shopping bills rent phone beauty clothing fuel gifts electronics snacks drinks vegetables fruits repairs health education entertainment groceries transport insurance subscriptions fitness pets childcare donations taxes miscellaneous cold-drinks smoke alcohol personal-care mutual-funds other".split(
     " ",
   ),
 );
@@ -1146,6 +1146,7 @@ export class OfflineClient {
             const type = String(template.type);
             if (type === "expense" && toCents(next.balance) < amount) {
               template.enabled = false;
+              changed = true;
               break;
             }
             const transaction: SavedTransaction = {

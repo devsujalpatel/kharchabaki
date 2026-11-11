@@ -6,7 +6,7 @@ mock.module(new URL('../dist/database/client.js', import.meta.url).href, {
   namedExports: { db: fakeDb },
 });
 
-const { addInterval } = await import('../dist/modules/recurring/recurring.route.js');
+const { addInterval, generateDue } = await import('../dist/modules/recurring/recurring.route.js');
 const { errorHandler } = await import('../dist/middleware/error.middleware.js');
 const { ApiError } = await import('../dist/utils/api-error.js');
 
@@ -71,4 +71,78 @@ test('error handler redacts and logs unexpected server failures', () => {
   } finally {
     original.mock.restore();
   }
+});
+
+test('an unfunded SIP pauses without advancing or blocking another funded rule', async () => {
+  const due = new Date('2026-01-31T00:00:00Z');
+  const template = (id, amount) => ({
+    id,
+    userId: 'investor',
+    type: 'expense',
+    category: 'mutual-funds',
+    amount,
+    schedule: 'monthly',
+    interval: '1',
+    startAt: due,
+    nextRunAt: due,
+    endAt: due,
+    enabled: true,
+  });
+  const queries = [
+    [template('unfunded', '200.00'), template('funded', '10.00')],
+    [{ id: 'investor' }],
+    [],
+    [{ balance: '100.00' }],
+    [{ id: 'investor' }],
+    [],
+    [{ balance: '100.00' }],
+  ];
+  const updates = [];
+  const inserts = [];
+  fakeDb.select = () => {
+    const rows = queries.shift();
+    const chain = {
+      from() {
+        return this;
+      },
+      where() {
+        return this;
+      },
+      orderBy() {
+        return this;
+      },
+      for() {
+        return this;
+      },
+      limit() {
+        return this;
+      },
+      then(resolve) {
+        return Promise.resolve(rows).then(resolve);
+      },
+    };
+    return chain;
+  };
+  fakeDb.transaction = async (work) => work(fakeDb);
+  fakeDb.update = () => ({
+    set(value) {
+      updates.push(value);
+      return { where: async () => [] };
+    },
+  });
+  fakeDb.insert = () => ({
+    values: async (value) => {
+      inserts.push(value);
+    },
+  });
+  await generateDue('investor');
+  assert.equal(inserts.length, 2);
+  assert.equal(inserts[0].amount, '10.00');
+  assert.ok(
+    updates.find(
+      (value) =>
+        value.enabled === false && value.nextRunAt?.getTime() === due.getTime(),
+    ),
+  );
+  assert.equal(queries.length, 0);
 });

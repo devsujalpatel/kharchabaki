@@ -71,7 +71,7 @@ export function CategoryPicker({
             />
           </div>
           <div
-            className="grid max-h-44 grid-cols-2 gap-1 overflow-y-auto overscroll-contain"
+            className="grid max-h-64 grid-cols-3 gap-1 overflow-y-auto overscroll-contain"
             aria-label={label}
           >
             {filtered.map((option) => {
@@ -88,19 +88,21 @@ export function CategoryPicker({
                     setSearch("");
                   }}
                   className={cn(
-                    "flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-2.5 text-left text-xs transition hover:bg-muted",
+                    "relative flex min-h-20 min-w-0 flex-col items-center justify-center gap-2 rounded-xl p-2 text-center text-xs transition hover:bg-muted",
                     value === option &&
                       "bg-primary/10 font-semibold text-primary",
                   )}
                 >
                   <OptionIcon className="size-4 shrink-0" />
                   <span
-                    className="min-w-0 flex-1 truncate"
+                    className="min-w-0 max-w-full truncate"
                     title={formatLabel(option)}
                   >
                     {formatLabel(option)}
                   </span>
-                  {value === option && <Check className="size-3 shrink-0" />}
+                  {value === option && (
+                    <Check className="absolute right-1 top-1 size-3" />
+                  )}
                 </button>
               );
             })}

@@ -1,3 +1,6 @@
+import { router } from "expo-router";
+import { CashTrend } from "@/components/FinanceCharts";
+import { RecentActivity } from "@/components/RecentActivity";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import { ArrowDownLeft, ArrowUpRight, Check, Wallet } from "lucide-react-native";
@@ -195,6 +198,18 @@ export default function Dashboard() {
           </Text>
         </Pressable>
       </View>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.push("/dashboard/investments")}
+        className="mt-5 rounded-3xl border border-app-primary/20 bg-app-card p-5"
+      >
+        <Text className="font-semibold text-app-text">↗ Investments & SIPs</Text>
+        <Text className="mt-2 text-sm text-app-subtle">
+          Make room for your future. Track funds and returns.
+        </Text>
+      </Pressable>
+      {summary.data && <CashTrend points={summary.data.data.monthly} />}
+      <RecentActivity month={month} />
       {feedback && (
         <View accessibilityRole="alert" className="mt-4 flex-row items-center justify-center gap-2">
           <Check size={15} color={colors.primary} />
@@ -247,7 +262,12 @@ export default function Dashboard() {
           <CategoryPicker
             label={isIncome ? "Source" : "Category"}
             value={selected}
-            options={[...(isIncome ? incomeSources : expenseCategories), ...(labels.data?.data ?? []).filter((item) => item.kind === (isIncome ? "income" : "expense") && item.active).map((item) => item.key)]}
+            options={[
+              ...(isIncome ? incomeSources : expenseCategories),
+              ...(labels.data?.data ?? [])
+                .filter((item) => item.kind === (isIncome ? "income" : "expense") && item.active)
+                .map((item) => item.key),
+            ]}
             disabled={mutation.isPending}
             onChange={(value) => {
               if (isIncome) setIncome((current) => ({ ...current, source: value }));

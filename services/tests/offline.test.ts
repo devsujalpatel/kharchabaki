@@ -1223,3 +1223,82 @@ test('invalid saved documents fail activation without replacing them or falling 
   assert.equal(f.storage.data.get(localKey), 'null');
   assert.deepEqual(f.calls, []);
 });
+
+test('mutual fund contributions, profit and returned capital persist as distinct cash flows', async () => {
+  const f = deviceFixture();
+  await f.client.activate('local:investor');
+  await f.client.request('/balance', {
+    method: 'POST',
+    body: JSON.stringify({ amount: 1000 }),
+  });
+  for (const [path, value] of [
+    [
+      '/expense',
+      { amount: 200, category: 'mutual-funds', description: 'Index fund' },
+    ],
+    ['/income', { amount: 20, source: 'investment-profit' }],
+    ['/income', { amount: 50, source: 'investment-redemption' }],
+    ['/expense', { amount: 10, category: 'cold-drinks' }],
+    ['/expense', { amount: 10, category: 'smoke' }],
+    ['/income', { amount: 5, source: 'cashback' }],
+  ] as const)
+    await f.client.request(path, {
+      method: 'POST',
+      body: JSON.stringify(value),
+    });
+  assert.equal(Number((await data(f.client, '/balance')).balance), 855);
+  const restored = deviceFixture(f.storage);
+  await restored.client.activate('local:investor');
+  assert.equal((await rows(restored.client)).length, 6);
+  assert.equal(Number((await data(restored.client, '/balance')).balance), 855);
+});
+
+test('monthly SIP deducts once, and an unfunded SIP stays paused after reopening', async () => {
+  const f = deviceFixture();
+  await f.client.activate('local:sip');
+  await f.client.request('/balance', {
+    method: 'POST',
+    body: JSON.stringify({ amount: 100 }),
+  });
+  const today = new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z';
+  await f.client.request('/recurring', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'expense',
+      amount: 25,
+      category: 'mutual-funds',
+      schedule: 'monthly',
+      startAt: today,
+    }),
+  });
+  await f.client.request('/recurring');
+  await f.client.request('/recurring');
+  assert.equal(Number((await data(f.client, '/balance')).balance), 75);
+  assert.equal(
+    (await rows(f.client)).filter((row) => row.category === 'mutual-funds')
+      .length,
+    1,
+  );
+  await f.client.request('/recurring', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'expense',
+      amount: 90,
+      category: 'mutual-funds',
+      schedule: 'monthly',
+      startAt: today,
+    }),
+  });
+  await f.client.request('/recurring');
+  const restored = deviceFixture(f.storage);
+  await restored.client.activate('local:sip');
+  const rules = (await data(restored.client, '/recurring')) as Record<
+    string,
+    unknown
+  >[];
+  assert.equal(
+    rules.find((rule) => Number(rule.amount) === 90)?.enabled,
+    false,
+  );
+  assert.equal(Number((await data(restored.client, '/balance')).balance), 75);
+});

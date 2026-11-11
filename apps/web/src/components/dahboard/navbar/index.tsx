@@ -13,6 +13,7 @@ import {
   Wallet,
   CalendarClock,
   Tags,
+  TrendingUp,
 } from "lucide-react";
 
 import { useAppSession } from "@/components/providers/session-provider";
@@ -39,6 +40,11 @@ const navigation = [
     label: "Transactions",
     href: "/dashboard/transactions",
     icon: Receipt,
+  },
+  {
+    label: "Investments",
+    href: "/dashboard/investments",
+    icon: TrendingUp,
   },
   {
     label: "Analytics",
@@ -116,7 +122,7 @@ export function Navbar() {
           <Logo className="scale-90" href="/dashboard" isTitle={false} />
 
           {/* Navigation */}
-          <nav className="ml-2 flex items-center gap-1">
+          <nav className="ml-2 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
             {navigation.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
@@ -127,8 +133,8 @@ export function Navbar() {
                   href={item.href}
                   prefetch
                   className={`
-                    inline-flex h-9 items-center justify-center
-                    gap-1.5 rounded-xl px-3
+                    inline-flex h-9 shrink-0 items-center justify-center
+                    gap-1.5 rounded-xl px-2
                     text-sm font-medium
                     transition-colors
                     ${
@@ -249,63 +255,69 @@ export function Navbar() {
           sm:hidden
         "
       >
-        <div className="mx-auto grid h-16 max-w-md grid-cols-5 px-2">
+        <div className="mx-auto grid h-20 max-w-lg grid-cols-5 px-2">
           {/* Home */}
-          {navigation.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
+          {navigation
+            .filter((item) =>
+              ["Home", "Transactions", "Investments", "Analytics"].includes(
+                item.label,
+              ),
+            )
+            .map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                prefetch
-                className={`
-                  relative flex flex-col items-center justify-center
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  prefetch
+                  className={`
+                  relative flex min-w-0 flex-col items-center justify-center
                   gap-1 rounded-xl
                   text-[11px] font-medium
                   transition-colors
                   ${active ? "text-foreground" : "text-muted-foreground"}
                 `}
-              >
-                <span
-                  className={`
+                >
+                  <span
+                    className={`
                     flex size-8 items-center justify-center
                     rounded-xl
                     transition-all
                     ${active ? "bg-primary/10" : "bg-transparent"}
                   `}
-                >
-                  <Icon
-                    className={`
+                  >
+                    <Icon
+                      className={`
                       size-5.25
                       transition-transform
                       ${active ? "stroke-[2.2]" : "stroke-[1.8]"}
                     `}
-                  />
-                </span>
+                    />
+                  </span>
 
-                <span>{item.label}</span>
+                  <span>{item.label}</span>
 
-                {active && (
-                  <span
-                    className="
+                  {active && (
+                    <span
+                      className="
                       absolute bottom-0
                       h-0.5 w-6
                       rounded-full bg-primary
                     "
-                  />
-                )}
-              </Link>
-            );
-          })}
+                    />
+                  )}
+                </Link>
+              );
+            })}
 
           {/* Profile */}
           <Link
             href="/dashboard/profile"
             prefetch
             className={`
-              relative flex flex-col items-center justify-center
+              relative flex min-w-0 flex-col items-center justify-center
               gap-1 rounded-xl
               text-[11px] font-medium
               transition-colors

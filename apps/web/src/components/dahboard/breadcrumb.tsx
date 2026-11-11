@@ -35,9 +35,9 @@ export const NavigationBreadcrumb = () => {
         <Link
           href="/dashboard"
           aria-label="Go back to dashboard"
-          className="inline-flex size-8 items-center justify-center rounded-lg hover:bg-muted"
+          className="inline-flex h-9 items-center justify-center gap-1 rounded-lg px-2 text-sm hover:bg-muted"
         >
-          <ChevronLeft className="size-4" />
+          <ChevronLeft className="size-4" /> Back
         </Link>
 
         <Breadcrumb>

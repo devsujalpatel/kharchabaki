@@ -12,15 +12,22 @@ import {
   type IncomeSource,
 } from "@/lib/finance";
 import { usePreferences } from "@/lib/preferences";
-import { updateTransaction, type Transaction } from "@/services/transactions";
+import {
+  addExpense,
+  addIncome,
+  updateTransaction,
+  type Transaction,
+} from "@/services/transactions";
 import { getLabels } from "@/lib/finance-features";
 
 export function TransactionEditor({
   transaction,
   onClose,
+  create = false,
 }: {
   transaction: Transaction;
   onClose: () => void;
+  create?: boolean;
 }) {
   const { colors, currency } = usePreferences();
   const client = useQueryClient();
@@ -29,9 +36,20 @@ export function TransactionEditor({
   const [description, setDescription] = useState(transaction.description ?? "");
   const [date, setDate] = useState(transaction.occurredAt.slice(0, 10));
   const labels = useQuery({ queryKey: ["finance-labels"], queryFn: getLabels });
-  const options = [...(transaction.type === "income" ? incomeSources : expenseCategories), ...(labels.data?.data ?? []).filter((item) => item.kind === transaction.type).map((item) => item.key), category];
+  const options = [
+    ...(transaction.type === "income" ? incomeSources : expenseCategories),
+    ...(labels.data?.data ?? [])
+      .filter((item) => item.kind === transaction.type)
+      .map((item) => item.key),
+    category,
+  ];
   const mutation = useMutation({
-    mutationFn: updateTransaction,
+    mutationFn: (value: Parameters<typeof updateTransaction>[0]) =>
+      create
+        ? transaction.type === "income"
+          ? addIncome({ ...value.data, source: category })
+          : addExpense({ ...value.data, category })
+        : updateTransaction(value),
     onSuccess: async () => {
       await Promise.all(
         ["transactions", "dashboard-summary", "balance"].map((key) =>
@@ -64,7 +82,7 @@ export function TransactionEditor({
   return (
     <FormSheet
       visible
-      title={`Edit ${transaction.type}`}
+      title={`${create ? "Add" : "Edit"} ${transaction.type}`}
       onClose={onClose}
       disabled={mutation.isPending}
       footer={

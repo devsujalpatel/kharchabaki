@@ -1,5 +1,9 @@
 import {
   Apple,
+  Cigarette,
+  CupSoda,
+  Wine,
+  Tags,
   Award,
   Baby,
   BadgeDollarSign,
@@ -68,6 +72,12 @@ export const expenseCategories = [
   "childcare",
   "donations",
   "taxes",
+  "miscellaneous",
+  "cold-drinks",
+  "smoke",
+  "alcohol",
+  "personal-care",
+  "mutual-funds",
   "other",
 ] as const;
 export const incomeSources = [
@@ -85,11 +95,26 @@ export const incomeSources = [
   "refund",
   "pension",
   "sale",
+  "cashback",
+  "reimbursement",
+  "miscellaneous",
+  "investment-profit",
+  "investment-redemption",
   "other",
 ] as const;
 export type ExpenseCategory = (typeof expenseCategories)[number];
 export type IncomeSource = (typeof incomeSources)[number];
 const categoryIcons: Record<string, typeof Wallet> = {
+  "cold-drinks": CupSoda,
+  smoke: Cigarette,
+  alcohol: Wine,
+  miscellaneous: CircleEllipsis,
+  "personal-care": Sparkles,
+  "mutual-funds": TrendingUp,
+  "investment-profit": ChartNoAxesCombined,
+  "investment-redemption": RotateCcw,
+  cashback: BadgeDollarSign,
+  reimbursement: RotateCcw,
   food: Utensils,
   travel: Plane,
   shopping: ShoppingBag,
@@ -137,9 +162,16 @@ const categoryIcons: Record<string, typeof Wallet> = {
   bonues: Award,
 };
 export function categoryIcon(category?: string | null) {
-  return categoryIcons[category ?? "other"] ?? CircleEllipsis;
+  return categoryIcons[category ?? "other"] ?? Tags;
 }
-export const themes = ["light", "dark", "ocean", "forest", "sunset", "rose"] as const;
+export const themes = [
+  "light",
+  "dark",
+  "ocean",
+  "forest",
+  "sunset",
+  "rose",
+] as const;
 export type ThemeName = (typeof themes)[number];
 export type Preferences = { currency: string; theme: ThemeName };
 export const palettes = {
@@ -224,7 +256,9 @@ export const popularCurrencies = [
 export const currencies = [
   ...new Set([
     ...popularCurrencies,
-    ...(typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("currency") : []),
+    ...(typeof Intl.supportedValuesOf === "function"
+      ? Intl.supportedValuesOf("currency")
+      : []),
   ]),
 ];
 export function currencyLabel(code: string) {
@@ -254,9 +288,11 @@ export function shiftMonth(month: string, delta: number) {
   return date.toISOString().slice(0, 7);
 }
 export function monthLabel(month: string) {
-  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(
-    new Date(`${month}-01T00:00:00Z`)
-  );
+  return new Intl.DateTimeFormat("en", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${month}-01T00:00:00Z`));
 }
 export function formatLabel(value: string) {
   return value

@@ -102,28 +102,34 @@ function CategoryOptions({
           autoCorrect={false}
         />
       </View>
-      {choices.map((option) => {
-        const Icon = option === "all" ? Shapes : categoryIcon(option);
-        const selected = value === option;
-        return (
-          <Pressable
-            key={option}
-            accessibilityRole="button"
-            accessibilityState={{ selected }}
-            accessibilityLabel={option === "all" ? "All categories" : formatLabel(option)}
-            onPress={() => onChange(option)}
-            className={`mb-1 min-h-14 flex-row items-center gap-3 rounded-2xl px-3 py-2 ${selected ? "bg-app-primary/10" : ""}`}
-          >
-            <View className="h-10 w-10 items-center justify-center rounded-xl bg-app-muted">
-              <Icon size={19} color={selected ? colors.primary : colors.subtle} />
-            </View>
-            <Text numberOfLines={1} className="min-w-0 flex-1 text-sm font-medium text-app-text">
-              {option === "all" ? "All categories" : formatLabel(option)}
-            </Text>
-            {selected && <Check size={18} color={colors.primary} />}
-          </Pressable>
-        );
-      })}
+      <View className="flex-row flex-wrap justify-between">
+        {choices.map((option) => {
+          const Icon = option === "all" ? Shapes : categoryIcon(option);
+          const selected = value === option;
+          return (
+            <Pressable
+              key={option}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={option === "all" ? "All categories" : formatLabel(option)}
+              onPress={() => onChange(option)}
+              className={`relative mb-2 min-h-24 w-[31%] items-center justify-center gap-2 rounded-2xl px-2 py-3 ${selected ? "bg-app-primary/10" : "bg-app-card"}`}
+            >
+              <View className="h-10 w-10 items-center justify-center rounded-xl bg-app-muted">
+                <Icon size={19} color={selected ? colors.primary : colors.subtle} />
+              </View>
+              <Text numberOfLines={2} className="text-center text-xs font-medium text-app-text">
+                {option === "all" ? "All categories" : formatLabel(option)}
+              </Text>
+              {selected && (
+                <View className="absolute right-1 top-1">
+                  <Check size={13} color={colors.primary} />
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
       {!choices.length && (
         <Text className="py-8 text-center text-sm text-app-subtle">No matches</Text>
       )}
